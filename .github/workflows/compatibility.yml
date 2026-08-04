@@ -1,0 +1,53 @@
+name: Vencord compatibility
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 12 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Iolite
+        uses: actions/checkout@v4
+        with:
+          path: iolite
+
+      - name: Check out Vencord
+        uses: actions/checkout@v4
+        with:
+          repository: Vendicated/Vencord
+          path: Vencord
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Add Iolite to Vencord
+        run: cp -R iolite Vencord/src/userplugins/iolite
+
+      - name: Install dependencies
+        working-directory: Vencord
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Iolite
+        working-directory: Vencord
+        run: pnpm exec eslint src/userplugins/iolite/index.tsx
+
+      - name: Type-check Vencord
+        working-directory: Vencord
+        run: pnpm testTsc
+
+      - name: Build Vencord
+        working-directory: Vencord
+        run: pnpm build

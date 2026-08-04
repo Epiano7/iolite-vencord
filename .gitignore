@@ -1,0 +1,9 @@
+.DS_Store
+Thumbs.db
+*.log
+dist/
+node_modules/
+.vscode/
+.idea/
+settings.json
+Vencord-backup-*/
