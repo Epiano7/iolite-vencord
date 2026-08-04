@@ -34,7 +34,9 @@ jobs:
           version: 11.9.0
 
       - name: Add Iolite to Vencord
-        run: cp -R iolite Vencord/src/userplugins/iolite
+        run: |
+          mkdir -p Vencord/src/userplugins
+          cp -R iolite Vencord/src/userplugins/iolite
 
       - name: Install dependencies
         working-directory: Vencord
