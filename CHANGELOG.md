@@ -2,6 +2,11 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.3.5 - 2026-08-04
+
+- Fixed a second **Patching Discord** delay caused by redirected pipe completion arriving long after the patcher process exited.
+- Redirects patcher output directly to a temporary log file, eliminating asynchronous pipe waits while retaining error details.
+
 ## 0.3.4 - 2026-08-04
 
 - Fixed the installer hanging at **Patching Discord** after the official Vencord CLI had already patched successfully.

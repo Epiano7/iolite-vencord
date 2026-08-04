@@ -694,44 +694,40 @@ internal static class InstallerEngine
 
     private static int RunVencordInstaller(string managedRoot, string action)
     {
+        if (action is not "--version" and not "-install" and not "-uninstall")
+            throw new ArgumentOutOfRangeException(nameof(action), "Unsupported Vencord installer action.");
+
         string systemTemp = Path.GetFullPath(Path.GetTempPath());
         string temporaryRoot = Path.Combine(systemTemp, $"IoliteInstaller-{Guid.NewGuid():N}");
         Directory.CreateDirectory(temporaryRoot);
         string installerPath = Path.Combine(temporaryRoot, "VencordInstallerCli.exe");
+        string logPath = Path.Combine(temporaryRoot, "VencordInstallerCli.log");
         File.WriteAllBytes(installerPath, InstallerResources.ReadBytes("VencordInstallerCli.exe"));
 
         try
         {
             ProcessStartInfo startInfo = new()
             {
-                FileName = installerPath,
+                FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
+                Arguments = $"/d /s /c \"\"{installerPath}\" {action} --branch auto > \"{logPath}\" 2>&1\"",
                 UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
+                CreateNoWindow = true
             };
-            startInfo.ArgumentList.Add(action);
-            startInfo.ArgumentList.Add("-branch");
-            startInfo.ArgumentList.Add("auto");
             startInfo.Environment["VENCORD_USER_DATA_DIR"] = managedRoot;
             startInfo.Environment["VENCORD_DEV_INSTALL"] = "1";
 
             using Process process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException("The Vencord installer could not be started.");
-            Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
-            Task<string> errorTask = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(60_000))
             {
                 process.Kill(true);
-                Task.WaitAll(outputTask, errorTask);
                 throw new TimeoutException(
                     "The Vencord patcher did not finish within 60 seconds. It was stopped and the previous runtime will be restored."
                 );
             }
-            Task.WaitAll(outputTask, errorTask);
             if (process.ExitCode != 0)
             {
-                string details = (outputTask.Result + Environment.NewLine + errorTask.Result).Trim();
+                string details = File.Exists(logPath) ? File.ReadAllText(logPath).Trim() : "No patcher log was produced.";
                 if (details.Length > 3000) details = details[^3000..];
                 throw new InvalidOperationException(
                     $"The Vencord patcher exited with code {process.ExitCode}.\n\n{details}"
