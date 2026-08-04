@@ -33,7 +33,8 @@ internal static class Program
             or "--self-test-source-preservation"
             or "--self-test-source-rollback"
             or "--self-test-source-build"
-            or "--self-test-pnpm";
+            or "--self-test-pnpm"
+            or "--self-test-vencord-cli";
 
         try
         {
@@ -48,6 +49,7 @@ internal static class Program
                 "--self-test-source-rollback" => InstallerEngine.SourceRollbackSelfTest(args),
                 "--self-test-source-build" => InstallerEngine.SourceBuildSelfTest(args),
                 "--self-test-pnpm" => InstallerEngine.PnpmSelfTest(args),
+                "--self-test-vencord-cli" => InstallerEngine.VencordCliSelfTest(),
                 "--ui-smoke-test" => InstallerWindow.Run(InstallerAction.SmokeTest),
                 "--version" => InstallerWindow.ShowInformation($"Iolite Installer {InstallerResources.ReadText("version.txt").Trim()}"),
                 _ => InstallerWindow.ShowInformation(
@@ -421,6 +423,8 @@ internal static class InstallerEngine
         return 0;
     }
 
+    internal static int VencordCliSelfTest() => RunVencordInstaller(Path.GetTempPath(), "--version");
+
     internal static int SourceRollbackSelfTest(string[] args)
     {
         if (args.Length != 2) return 64;
@@ -702,7 +706,9 @@ internal static class InstallerEngine
             {
                 FileName = installerPath,
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
             };
             startInfo.ArgumentList.Add(action);
             startInfo.ArgumentList.Add("-branch");
@@ -712,7 +718,25 @@ internal static class InstallerEngine
 
             using Process process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException("The Vencord installer could not be started.");
-            process.WaitForExit();
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> errorTask = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(60_000))
+            {
+                process.Kill(true);
+                Task.WaitAll(outputTask, errorTask);
+                throw new TimeoutException(
+                    "The Vencord patcher did not finish within 60 seconds. It was stopped and the previous runtime will be restored."
+                );
+            }
+            Task.WaitAll(outputTask, errorTask);
+            if (process.ExitCode != 0)
+            {
+                string details = (outputTask.Result + Environment.NewLine + errorTask.Result).Trim();
+                if (details.Length > 3000) details = details[^3000..];
+                throw new InvalidOperationException(
+                    $"The Vencord patcher exited with code {process.ExitCode}.\n\n{details}"
+                );
+            }
             return process.ExitCode;
         }
         finally

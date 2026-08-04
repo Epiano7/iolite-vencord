@@ -176,6 +176,12 @@ jobs:
             throw "Installer could not invoke pnpm for source-build integration"
           }
 
+          $vencordCli = Start-Process -FilePath $installer -ArgumentList "--self-test-vencord-cli" -Wait -PassThru
+          if ($vencordCli.ExitCode -ne 0) {
+            Get-Content (Join-Path $env:RUNNER_TEMP "IoliteInstaller-self-test.log") -ErrorAction SilentlyContinue
+            throw "The hidden Vencord CLI output test failed or timed out"
+          }
+
           $sourceBuild = Start-Process -FilePath $installer -ArgumentList @("--self-test-source-build", (Resolve-Path "Vencord")) -Wait -PassThru
           if ($sourceBuild.ExitCode -ne 0) {
             Get-Content (Join-Path $env:RUNNER_TEMP "IoliteInstaller-self-test.log") -ErrorAction SilentlyContinue

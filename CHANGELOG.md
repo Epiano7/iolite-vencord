@@ -2,6 +2,12 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.3.4 - 2026-08-04
+
+- Fixed the installer hanging at **Patching Discord** after the official Vencord CLI had already patched successfully.
+- Continuously drains the hidden patcher's output and errors so it can exit normally.
+- Adds a 60-second patch timeout with child-process cleanup, rollback, and visible error details.
+
 ## 0.3.3 - 2026-08-04
 
 - Isolated the quick moderation panel from custom theme and global CSS overrides.
