@@ -2,6 +2,14 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.2.0 - 2026-08-04
+
+- Moved Warn, Mute, Kick, Ban, and View Warns directly into the native user context menu.
+- Added an option to replace Start a Call and Add Note with Iolite's fast actions.
+- Replaced punishment submenus with a non-blocking floating editor.
+- Added persistent on-screen Sapphire responses for background warning lookups.
+- Added three configurable profile-targeted keyboard presets.
+
 ## 0.1.1 - 2026-08-04
 
 - Fixed a context-menu validation error that crashed Discord when right-clicking a user.

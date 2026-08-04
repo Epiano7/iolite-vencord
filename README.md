@@ -1,16 +1,18 @@
 # Iolite
 
-Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sapph.xyz) commands. It adds user-context-menu composers for common moderation commands without opening a screen-blocking modal.
+Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sapph.xyz) commands. It provides fast moderation actions without opening a screen-blocking modal.
 
 > [!IMPORTANT]
 > Iolite is a private user plugin. It requires building Vencord from source and is not part of Vencord's approved built-in plugin collection. Client modifications are against Discord's Terms of Service; use them at your own discretion.
 
 ## Features
 
-- Warn, mute, kick, ban, and view warnings from a user's context menu.
-- Enter a reason and optional duration inside the context submenu.
-- Preview the exact command before sending it.
+- Warn, mute, kick, ban, and view warnings directly from a user's context menu—no Iolite dropdown.
+- Optionally replace **Start a Call** and **Add Note** with the fast moderation rows.
+- Enter a reason and optional duration in a small floating editor while the rest of Discord stays usable.
 - Send to the current channel or a configured private moderation channel.
+- Show Sapphire's warnings response as a persistent in-app notification when the command runs elsewhere.
+- Configure three keyboard presets with an action, duration, reason, destination, and shortcut. Presets only work while a user's profile is open.
 - Store a different Sapphire prefix for each server.
 - Add Sapphire's `-r` punishment-review flag.
 
@@ -86,13 +88,23 @@ Restart Discord. Open **Settings → Vencord → Plugins**, search for **Iolite*
 
 ## Configuration
 
-Right-click a member inside a server and open **Iolite · Sapphire Actions → Configure this server**.
+Right-click a member inside a server and open **Iolite Server Settings**.
 
 - **Prefix for this server:** Enter `?`, `!`, `s!`, or that server's configured Sapphire prefix.
 - **Private moderation channel ID:** Enable Discord Developer Mode, right-click the private channel, and select **Copy Channel ID**.
 - **Default private destination:** Enable **Default To Private Channel** in Iolite's normal Vencord plugin settings, then enter the destination in **Default Private Channel ID**.
 
 Iolite verifies that the configured private destination belongs to the current server. A server-specific channel ID set from the context menu overrides the default channel ID.
+
+### Keyboard presets
+
+Open Iolite's normal Vencord settings and configure **Preset 1**, **Preset 2**, or **Preset 3**. A shortcut can be a single key such as `1` or a combination such as `Ctrl+1`.
+
+Left-click a member to open their profile, then press the configured shortcut. Iolite ignores preset shortcuts while you are typing in chat, a reason field, or another text input. A private preset fails safely instead of sending publicly when its private channel is unavailable.
+
+### Background warning lookups
+
+When **View Warns** sends to a channel other than the one currently open, Iolite waits for Sapphire's reply and shows it as a persistent in-app notification. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
 
 ## Updating
 
@@ -130,7 +142,7 @@ The repository's scheduled GitHub Actions workflow checks Iolite against the lat
 Place this repository at `Vencord/src/userplugins/iolite`, then run from the Vencord root:
 
 ```powershell
-pnpm exec eslint src/userplugins/iolite/index.tsx
+pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx
 pnpm testTsc
 pnpm build
 ```

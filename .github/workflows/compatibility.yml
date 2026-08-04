@@ -44,7 +44,7 @@ jobs:
 
       - name: Lint Iolite
         working-directory: Vencord
-        run: pnpm exec eslint src/userplugins/iolite/index.tsx
+        run: pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx
 
       - name: Type-check Vencord
         working-directory: Vencord
