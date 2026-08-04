@@ -17,6 +17,7 @@ import {
     SelectedChannelStore,
     showToast,
     Toasts,
+    UserStore,
     useState
 } from "@webpack/common";
 
@@ -44,6 +45,13 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Prefer the configured private moderation channel when one is available",
         default: false
+    },
+    defaultPrivateChannelId: {
+        type: OptionType.STRING,
+        description: "Channel ID used by default when private-channel sending is enabled",
+        placeholder: "Right-click channel → Copy Channel ID",
+        default: "",
+        disabled: () => !settings.store.defaultToPrivateChannel
     },
     guildConfigs: {
         type: OptionType.CUSTOM,
@@ -74,7 +82,8 @@ function getCurrentChannelId(channel?: Channel): string | undefined {
 }
 
 function getPrivateChannel(guildId: string): Channel | undefined {
-    const id = getGuildConfig(guildId).privateChannelId?.trim();
+    const id = getGuildConfig(guildId).privateChannelId?.trim()
+        || settings.store.defaultPrivateChannelId.trim();
     if (!id) return;
 
     const channel = ChannelStore.getChannel(id);
@@ -318,18 +327,25 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: User
     if (!props.guildId || !props.user) return;
 
     children.push(
-        <IoliteMenu
-            channel={props.channel}
-            guildId={props.guildId}
-            user={props.user}
-        />
+        IoliteMenu({
+            channel: props.channel,
+            guildId: props.guildId,
+            user: props.user
+        })
     );
+};
+
+const author = {
+    name: "Epiano7",
+    get id() {
+        return BigInt(UserStore?.getCurrentUser()?.id ?? "0");
+    }
 };
 
 export default definePlugin({
     name: "Iolite",
-    description: "A compact Sapphire moderation companion for Vencord.",
-    authors: [{ name: "Epiano7", id: 0n }],
+    description: "A QoL vencord plugin for Sapphire commands",
+    authors: [author],
     settings,
     contextMenus: {
         "user-context": UserContextMenuPatch

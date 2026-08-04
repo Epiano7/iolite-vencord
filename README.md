@@ -1,6 +1,6 @@
 # Iolite
 
-Iolite is a compact [Vencord](https://vencord.dev) companion for the [Sapphire](https://sapph.xyz) Discord moderation bot. It adds user-context-menu composers for common moderation commands without opening a screen-blocking modal.
+Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sapph.xyz) commands. It adds user-context-menu composers for common moderation commands without opening a screen-blocking modal.
 
 > [!IMPORTANT]
 > Iolite is a private user plugin. It requires building Vencord from source and is not part of Vencord's approved built-in plugin collection. Client modifications are against Discord's Terms of Service; use them at your own discretion.
@@ -90,9 +90,9 @@ Right-click a member inside a server and open **Iolite · Sapphire Actions → C
 
 - **Prefix for this server:** Enter `?`, `!`, `s!`, or that server's configured Sapphire prefix.
 - **Private moderation channel ID:** Enable Discord Developer Mode, right-click the private channel, and select **Copy Channel ID**.
-- **Default private destination:** Available in Iolite's normal Vencord plugin settings.
+- **Default private destination:** Enable **Default To Private Channel** in Iolite's normal Vencord plugin settings, then enter the destination in **Default Private Channel ID**.
 
-Iolite verifies that the configured private destination belongs to the current server.
+Iolite verifies that the configured private destination belongs to the current server. A server-specific channel ID set from the context menu overrides the default channel ID.
 
 ## Updating
 
