@@ -10,12 +10,12 @@ import { definePluginSettings } from "@api/Settings";
 import { sendMessage } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import type { Channel, Message, User } from "@vencord/discord-types";
-import { findComponentLazy } from "@webpack";
 import {
     ChannelStore,
     ContextMenuApi,
     createRoot,
     Menu,
+    Parser,
     SelectedChannelStore,
     SelectedGuildStore,
     showToast,
@@ -42,8 +42,6 @@ const DESTINATION_OPTIONS = [
     { label: "Current channel", value: "current", default: true },
     { label: "Private moderation channel", value: "private" }
 ] as const;
-
-const NativeMessageEmbed = findComponentLazy<any>(module => module.prototype?.renderSuppressButton);
 
 interface GuildConfig {
     prefix?: string;
@@ -513,55 +511,74 @@ function extractSapphireResponse(message: Message): string {
     return [message.content, ...embedText].filter(Boolean).join("\n").trim();
 }
 
-function normalizeEmbedMedia(media: any) {
-    if (!media) return undefined;
-    return {
-        ...media,
-        proxyURL: media.proxyURL ?? media.proxy_url,
-        placeholderVersion: media.placeholderVersion ?? media.placeholder_version,
-        contentType: media.contentType ?? media.content_type,
-        srcIsAnimated: media.srcIsAnimated ?? false
-    };
+function embedMediaUrl(media: any): string | undefined {
+    return media?.proxyURL ?? media?.proxy_url ?? media?.url;
 }
 
-function normalizeSapphireEmbed(embed: any) {
-    if (!embed) return undefined;
+function embedColor(color: unknown): string {
+    if (typeof color === "number") return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
+    if (typeof color === "string" && (/^#[\da-f]{6}$/i.test(color) || color.startsWith("var("))) return color;
+    return "var(--brand-500)";
+}
 
-    const numericColor = typeof embed.color === "number"
-        ? embed.color
-        : /^\d+$/.test(embed.color ?? "")
-            ? Number(embed.color)
-            : undefined;
-    const color = numericColor == null
-        ? embed.color
-        : `#${(numericColor & 0xffffff).toString(16).padStart(6, "0")}`;
+function EmbedText({ children }: { children: unknown; }) {
+    const text = typeof children === "string" ? children : String(children ?? "");
+    return text ? <>{Parser.parse(text)}</> : null;
+}
 
-    return {
-        ...embed,
-        rawTitle: embed.rawTitle ?? embed.title ?? "",
-        rawDescription: embed.rawDescription ?? embed.description ?? "",
-        color,
-        timestamp: typeof embed.timestamp === "string" ? new Date(embed.timestamp) : embed.timestamp,
-        author: embed.author && {
-            ...embed.author,
-            iconURL: embed.author.iconURL ?? embed.author.icon_url,
-            iconProxyURL: embed.author.iconProxyURL ?? embed.author.proxy_icon_url
-        },
-        footer: embed.footer && {
-            ...embed.footer,
-            iconURL: embed.footer.iconURL ?? embed.footer.icon_url,
-            iconProxyURL: embed.footer.iconProxyURL ?? embed.footer.proxy_icon_url
-        },
-        thumbnail: normalizeEmbedMedia(embed.thumbnail),
-        image: normalizeEmbedMedia(embed.image),
-        images: embed.images?.map(normalizeEmbedMedia),
-        video: normalizeEmbedMedia(embed.video),
-        fields: (embed.fields ?? []).map((field: any) => ({
-            ...field,
-            rawName: field.rawName ?? field.name ?? "",
-            rawValue: field.rawValue ?? field.value ?? ""
-        }))
-    };
+function SapphireEmbedCard({ embed }: { embed: any; }) {
+    const authorIcon = embedMediaUrl({
+        proxyURL: embed.author?.iconProxyURL ?? embed.author?.proxy_icon_url,
+        url: embed.author?.iconURL ?? embed.author?.icon_url
+    });
+    const thumbnail = embedMediaUrl(embed.thumbnail);
+    const image = embedMediaUrl(embed.image) ?? embedMediaUrl(embed.images?.[0]);
+    const footerIcon = embedMediaUrl({
+        proxyURL: embed.footer?.iconProxyURL ?? embed.footer?.proxy_icon_url,
+        url: embed.footer?.iconURL ?? embed.footer?.icon_url
+    });
+
+    return (
+        <div style={{
+            background: "var(--background-secondary)",
+            borderRadius: 4,
+            display: "grid",
+            gridTemplateColumns: "4px minmax(0, 1fr)",
+            maxWidth: 520,
+            overflow: "hidden",
+            width: "100%"
+        }}>
+            <div style={{ background: embedColor(embed.color) }} />
+            <div style={{ minWidth: 0, padding: "12px 16px 16px" }}>
+                {embed.author?.name && <div style={{ alignItems: "center", display: "flex", fontSize: 12, fontWeight: 600, gap: 8, marginBottom: 8 }}>
+                    {authorIcon && <img alt="" src={authorIcon} style={{ borderRadius: "50%", height: 24, width: 24 }} />}
+                    <EmbedText>{embed.author.name}</EmbedText>
+                </div>}
+                <div style={{ display: "flex", gap: 16 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        {embed.title && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+                            <EmbedText>{embed.title}</EmbedText>
+                        </div>}
+                        {embed.description && <div style={{ fontSize: 14, lineHeight: "18px", whiteSpace: "pre-wrap" }}>
+                            <EmbedText>{embed.description}</EmbedText>
+                        </div>}
+                    </div>
+                    {thumbnail && <img alt="" src={thumbnail} style={{ borderRadius: 4, height: 80, objectFit: "cover", width: 80 }} />}
+                </div>
+                {!!embed.fields?.length && <div style={{ display: "grid", gap: "8px 16px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", marginTop: 12 }}>
+                    {embed.fields.map((field: any, index: number) => <div key={index} style={{ gridColumn: field.inline ? "span 1" : "1 / -1", minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}><EmbedText>{field.name}</EmbedText></div>
+                        <div style={{ fontSize: 14, lineHeight: "18px", whiteSpace: "pre-wrap" }}><EmbedText>{field.value}</EmbedText></div>
+                    </div>)}
+                </div>}
+                {image && <img alt="" src={image} style={{ borderRadius: 4, display: "block", marginTop: 16, maxHeight: 300, maxWidth: "100%", objectFit: "contain" }} />}
+                {(embed.footer?.text || embed.timestamp) && <div style={{ alignItems: "center", display: "flex", fontSize: 12, gap: 8, marginTop: 8, opacity: 0.8 }}>
+                    {footerIcon && <img alt="" src={footerIcon} style={{ borderRadius: "50%", height: 20, width: 20 }} />}
+                    <span>{[embed.footer?.text, embed.timestamp && new Date(embed.timestamp).toLocaleString()].filter(Boolean).join(" • ")}</span>
+                </div>}
+            </div>
+        </div>
+    );
 }
 
 function handleMessageCreate({ message, optimistic }: { message: Message; optimistic: boolean; }) {
@@ -574,19 +591,20 @@ function handleMessageCreate({ message, optimistic }: { message: Message; optimi
     if (message.channel_id !== lookup.channelId || !message.author?.bot) return;
 
     const configuredBotId = settings.store.sapphireBotId.trim();
+    const authorName = String(message.author.username ?? "").toLowerCase();
     const isSapphire = configuredBotId
         ? message.author.id === configuredBotId
-        : message.author.username.toLowerCase().includes("sapphire");
+        : authorName.includes("sapphire");
     if (!isSapphire) return;
 
     clearPendingWarnLookup();
-    const sapphireEmbed = normalizeSapphireEmbed(message.embeds?.[0]);
+    const sapphireEmbed = message.embeds?.[0];
     showNotification({
         title: `Sapphire warns · ${lookup.user.username}`,
         body: extractSapphireResponse(message) || "Sapphire responded without text.",
         richBody: sapphireEmbed
             ? <div style={{ maxHeight: "min(65vh, 640px)", overflow: "auto", width: "100%" }}>
-                <NativeMessageEmbed embed={sapphireEmbed} />
+                <SapphireEmbedCard embed={sapphireEmbed} />
             </div>
             : undefined,
         permanent: true,
