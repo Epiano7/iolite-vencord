@@ -100,7 +100,6 @@ jobs:
           $resources = "iolite/installer/Iolite.Installer/Resources"
           New-Item -ItemType Directory -Force "$payload/dist", "$payload/LICENSES", $resources | Out-Null
           $runtimeFiles = @(
-            "package.json",
             "patcher.js",
             "patcher.js.LEGAL.txt",
             "preload.js",
@@ -109,6 +108,7 @@ jobs:
             "renderer.css"
           )
           foreach ($file in $runtimeFiles) { Copy-Item "Vencord/dist/$file" "$payload/dist/$file" }
+          "{}" | Set-Content "$payload/dist/package.json" -NoNewline
           Copy-Item Vencord/LICENSE "$payload/LICENSES/Vencord-GPL-3.0.txt"
           Copy-Item iolite/LICENSE "$payload/LICENSES/Iolite-GPL-3.0.txt"
           Copy-Item VencordInstaller/LICENSE "$payload/LICENSES/VencordInstaller-GPL-3.0.txt"
