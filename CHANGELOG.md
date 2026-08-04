@@ -2,6 +2,12 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.3.3 - 2026-08-04
+
+- Isolated the quick moderation panel from custom theme and global CSS overrides.
+- Added opaque Discord-like dark and light palettes so server content cannot show through the form.
+- Raised the panel above other client layers and locally styled its inputs, buttons, checkbox, and text.
+
 ## 0.3.2 - 2026-08-04
 
 - Replaced transient confirmation boxes with a persistent installer window showing progress, errors, and an explicit completion screen.

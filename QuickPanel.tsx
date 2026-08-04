@@ -5,7 +5,7 @@
  */
 
 import type { User } from "@vencord/discord-types";
-import { TextInput, useEffect, useState } from "@webpack/common";
+import { useEffect, useState } from "@webpack/common";
 
 export type QuickCommand = "ban" | "kick" | "mute" | "warn";
 export type QuickDestination = "current" | "private";
@@ -26,18 +26,37 @@ interface QuickPanelProps {
     user: User;
 }
 
-const panelStyle = {
+const darkPalette = {
+    background: "#111214",
+    border: "#2e3035",
+    button: "#2b2d31",
+    input: "#1e1f22",
+    muted: "#b5bac1",
+    text: "#f2f3f5"
+} as const;
+
+const lightPalette = {
+    background: "#ffffff",
+    border: "#d8d9dc",
+    button: "#e3e5e8",
+    input: "#f2f3f5",
+    muted: "#5c5e66",
+    text: "#313338"
+} as const;
+
+const panelBaseStyle = {
     position: "fixed",
     right: "18px",
     bottom: "18px",
-    zIndex: 1002,
+    zIndex: 2147483647,
     width: "340px",
+    boxSizing: "border-box",
     padding: "16px",
-    border: "1px solid var(--border-subtle)",
     borderRadius: "12px",
-    background: "var(--background-floating)",
-    boxShadow: "var(--shadow-high)",
-    color: "var(--text-normal)"
+    fontFamily: "gg sans, Noto Sans, Helvetica Neue, Helvetica, Arial, sans-serif",
+    fontSize: "14px",
+    lineHeight: 1.3,
+    isolation: "isolate"
 } as const;
 
 const rowStyle = {
@@ -46,14 +65,16 @@ const rowStyle = {
     marginTop: "12px"
 } as const;
 
-const buttonStyle = {
+const buttonBaseStyle = {
     flex: 1,
     minHeight: "34px",
     border: 0,
     borderRadius: "4px",
     padding: "6px 10px",
     cursor: "pointer",
-    color: "var(--white-500)",
+    color: "#ffffff",
+    fontFamily: "inherit",
+    fontSize: "14px",
     fontWeight: 600
 } as const;
 
@@ -69,6 +90,33 @@ export function QuickPanel({
     const [duration, setDuration] = useState("");
     const [reason, setReason] = useState("");
     const [review, setReview] = useState(false);
+    const isLight = document.documentElement.classList.contains("theme-light")
+        || document.body.classList.contains("theme-light");
+    const palette = isLight ? lightPalette : darkPalette;
+    const panelStyle = {
+        ...panelBaseStyle,
+        border: `1px solid ${palette.border}`,
+        backgroundColor: palette.background,
+        boxShadow: isLight
+            ? "0 8px 32px rgba(0, 0, 0, 0.24)"
+            : "0 8px 32px rgba(0, 0, 0, 0.72)",
+        color: palette.text,
+        colorScheme: isLight ? "light" : "dark"
+    } as const;
+    const inputStyle = {
+        width: "100%",
+        boxSizing: "border-box",
+        minHeight: "40px",
+        border: `1px solid ${palette.border}`,
+        borderRadius: "4px",
+        outline: 0,
+        padding: "10px 12px",
+        backgroundColor: palette.input,
+        color: palette.text,
+        caretColor: palette.text,
+        fontFamily: "inherit",
+        fontSize: "14px"
+    } as const;
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -94,7 +142,7 @@ export function QuickPanel({
                     <div style={{ fontSize: "16px", fontWeight: 700 }}>
                         {command[0].toUpperCase() + command.slice(1)} {user.username}
                     </div>
-                    <div style={{ marginTop: "2px", color: "var(--text-muted)", fontSize: "12px" }}>
+                    <div style={{ marginTop: "2px", color: palette.muted, fontSize: "12px" }}>
                         Iolite · Sapphire
                     </div>
                 </div>
@@ -102,7 +150,7 @@ export function QuickPanel({
                     aria-label="Close"
                     type="button"
                     onClick={onClose}
-                    style={{ border: 0, background: "transparent", color: "var(--interactive-normal)", cursor: "pointer", fontSize: "22px" }}
+                    style={{ border: 0, background: "transparent", color: palette.muted, cursor: "pointer", fontSize: "22px" }}
                 >
                     ×
                 </button>
@@ -111,13 +159,24 @@ export function QuickPanel({
             {supportsDuration && (
                 <div style={{ marginTop: "14px" }}>
                     <div style={{ marginBottom: "6px", fontSize: "12px", fontWeight: 600 }}>Duration (optional)</div>
-                    <TextInput value={duration} onChange={setDuration} placeholder="e.g. 1h, 7d" />
+                    <input
+                        value={duration}
+                        onChange={event => setDuration(event.currentTarget.value)}
+                        placeholder="e.g. 1h, 7d"
+                        style={inputStyle}
+                    />
                 </div>
             )}
 
             <div style={{ marginTop: "12px" }}>
                 <div style={{ marginBottom: "6px", fontSize: "12px", fontWeight: 600 }}>Reason (optional)</div>
-                <TextInput value={reason} onChange={setReason} placeholder="Moderation reason" autoFocus />
+                <input
+                    value={reason}
+                    onChange={event => setReason(event.currentTarget.value)}
+                    placeholder="Moderation reason"
+                    style={inputStyle}
+                    autoFocus
+                />
             </div>
 
             <div style={{ marginTop: "12px", fontSize: "12px", fontWeight: 600 }}>Destination</div>
@@ -125,8 +184,9 @@ export function QuickPanel({
                 <button
                     type="button"
                     style={{
-                        ...buttonStyle,
-                        background: destination === "current" ? "var(--brand-500)" : "var(--background-modifier-accent)"
+                        ...buttonBaseStyle,
+                        background: destination === "current" ? "#5865f2" : palette.button,
+                        color: destination === "current" ? "#ffffff" : palette.text
                     }}
                     onClick={() => setDestination("current")}
                 >
@@ -136,10 +196,11 @@ export function QuickPanel({
                     type="button"
                     disabled={!hasPrivateChannel}
                     style={{
-                        ...buttonStyle,
+                        ...buttonBaseStyle,
                         cursor: hasPrivateChannel ? "pointer" : "not-allowed",
                         opacity: hasPrivateChannel ? 1 : 0.5,
-                        background: destination === "private" ? "var(--brand-500)" : "var(--background-modifier-accent)"
+                        background: destination === "private" ? "#5865f2" : palette.button,
+                        color: destination === "private" ? "#ffffff" : palette.text
                     }}
                     onClick={() => setDestination("private")}
                 >
@@ -148,7 +209,12 @@ export function QuickPanel({
             </div>
 
             <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px", cursor: "pointer", fontSize: "13px" }}>
-                <input type="checkbox" checked={review} onChange={event => setReview(event.currentTarget.checked)} />
+                <input
+                    type="checkbox"
+                    checked={review}
+                    onChange={event => setReview(event.currentTarget.checked)}
+                    style={{ accentColor: "#5865f2" }}
+                />
                 Send for Sapphire review (-r)
             </label>
 
@@ -156,15 +222,15 @@ export function QuickPanel({
                 <button
                     type="button"
                     onClick={onClose}
-                    style={{ ...buttonStyle, background: "var(--background-modifier-accent)" }}
+                    style={{ ...buttonBaseStyle, background: palette.button, color: palette.text }}
                 >
                     Cancel
                 </button>
                 <button
                     type="submit"
                     style={{
-                        ...buttonStyle,
-                        background: command === "ban" ? "var(--status-danger)" : "var(--brand-500)"
+                        ...buttonBaseStyle,
+                        background: command === "ban" ? "#da373c" : "#5865f2"
                     }}
                 >
                     Send {command}

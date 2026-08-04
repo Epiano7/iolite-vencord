@@ -316,7 +316,10 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
     quickPanelContainer = document.createElement("div");
     quickPanelContainer.id = "vc-iolite-quick-panel";
     document.body.append(quickPanelContainer);
-    quickPanelRoot = createRoot(quickPanelContainer);
+    const shadowRoot = quickPanelContainer.attachShadow({ mode: "closed" });
+    const mountPoint = document.createElement("div");
+    shadowRoot.append(mountPoint);
+    quickPanelRoot = createRoot(mountPoint);
 
     const defaultDestination = getDefaultDestination(guildId) as QuickDestination;
     quickPanelRoot.render(
