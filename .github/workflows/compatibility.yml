@@ -23,23 +23,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Iolite
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: iolite
 
       - name: Check out Vencord
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Vendicated/Vencord
           path: Vencord
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6.0.9
         with:
           version: 11.9.0
 

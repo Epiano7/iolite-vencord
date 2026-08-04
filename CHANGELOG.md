@@ -2,6 +2,15 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.3.0 - 2026-08-04
+
+- Added a self-contained Windows x64 installer for pinned, tested Iolite/Vencord releases.
+- Added settings backups, managed-runtime rollback, repair, uninstall, and payload integrity checks.
+- Added an automated release workflow with executable checksums and exact corresponding-source archives.
+- Replaced Discord's crash-prone private embed renderer with Iolite's safe Discord-styled Sapphire embed card.
+- Added a complete installation guide and clarified how Iolite appears in Vencord's plugin list.
+- Updated GitHub Actions dependencies to their current Node.js 24-based releases.
+
 ## 0.2.0 - 2026-08-04
 
 - Moved Warn, Mute, Kick, Ban, and View Warns directly into the native user context menu.

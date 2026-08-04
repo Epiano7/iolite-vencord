@@ -38,12 +38,15 @@ Iolite does not appear as a discoverable plugin in a standard Vencord installati
 
 The [full installation guide](INSTALL.md) covers:
 
+- installing the pinned Windows release with one executable and no development tools;
 - installing Vencord and Iolite from scratch;
 - moving from normal/prebuilt Vencord without intentionally losing existing plugin settings;
 - adding Iolite alongside other custom plugins;
 - Vesktop, updates, removal, and troubleshooting.
 
 Because this repository is private, each installer must first be granted repository access through their GitHub account.
+
+For most Windows users, the recommended route is the latest `IoliteSetup-...exe` from the private [Releases page](https://github.com/Epiano7/iolite-vencord/releases). Source/custom-plugin users should follow the manual guide so their other custom plugins remain compiled into Vencord.
 
 ## Configuration
 

@@ -1,0 +1,162 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out Iolite
+        uses: actions/checkout@v7
+        with:
+          path: iolite
+          fetch-depth: 0
+
+      - name: Read pinned versions
+        id: versions
+        shell: pwsh
+        run: |
+          "iolite_version=$(Get-Content iolite/VERSION -Raw | ForEach-Object Trim)" >> $env:GITHUB_OUTPUT
+          "vencord_ref=$(Get-Content iolite/installer/VENCORD_REF -Raw | ForEach-Object Trim)" >> $env:GITHUB_OUTPUT
+          "installer_version=$(Get-Content iolite/installer/VENCORD_INSTALLER_VERSION -Raw | ForEach-Object Trim)" >> $env:GITHUB_OUTPUT
+
+      - name: Verify release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -ne "v${{ steps.versions.outputs.iolite_version }}") {
+            throw "Tag $env:GITHUB_REF_NAME does not match VERSION v${{ steps.versions.outputs.iolite_version }}"
+          }
+
+      - name: Check out pinned Vencord
+        uses: actions/checkout@v7
+        with:
+          repository: Vendicated/Vencord
+          ref: ${{ steps.versions.outputs.vencord_ref }}
+          path: Vencord
+
+      - name: Check out pinned Vencord Installer source
+        uses: actions/checkout@v7
+        with:
+          repository: Vencord/Installer
+          ref: ${{ steps.versions.outputs.installer_version }}
+          path: VencordInstaller
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6.0.9
+        with:
+          version: 11.9.0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Add Iolite to Vencord
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Vencord/src/userplugins/iolite | Out-Null
+          Copy-Item iolite/index.tsx,iolite/QuickPanel.tsx Vencord/src/userplugins/iolite/
+
+      - name: Install Vencord dependencies
+        working-directory: Vencord
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Iolite and Vencord
+        working-directory: Vencord
+        shell: pwsh
+        run: |
+          pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx
+          pnpm testTsc
+          node --require=./scripts/suppressExperimentalWarnings.js scripts/build/build.mjs --disable-updater
+
+      - name: Download and verify official Vencord installer
+        shell: pwsh
+        run: |
+          $version = "${{ steps.versions.outputs.installer_version }}"
+          $base = "https://github.com/Vencord/Installer/releases/download/$version"
+          Invoke-WebRequest "$base/VencordInstallerCli.exe" -OutFile VencordInstallerCli.exe
+          Invoke-WebRequest "$base/checksums.sha256" -OutFile checksums.sha256
+          $expected = ((Select-String -Path checksums.sha256 -Pattern "VencordInstallerCli.exe").Line -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash VencordInstallerCli.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "Vencord installer checksum mismatch" }
+
+      - name: Prepare embedded runtime
+        shell: pwsh
+        run: |
+          $payload = Join-Path $env:RUNNER_TEMP "iolite-payload"
+          $resources = "iolite/installer/Iolite.Installer/Resources"
+          New-Item -ItemType Directory -Force "$payload/dist", "$payload/LICENSES", $resources | Out-Null
+          $runtimeFiles = @(
+            "package.json",
+            "patcher.js",
+            "patcher.js.LEGAL.txt",
+            "preload.js",
+            "renderer.js",
+            "renderer.js.LEGAL.txt",
+            "renderer.css"
+          )
+          foreach ($file in $runtimeFiles) { Copy-Item "Vencord/dist/$file" "$payload/dist/$file" }
+          Copy-Item Vencord/LICENSE "$payload/LICENSES/Vencord-GPL-3.0.txt"
+          Copy-Item iolite/LICENSE "$payload/LICENSES/Iolite-GPL-3.0.txt"
+          Copy-Item VencordInstaller/LICENSE "$payload/LICENSES/VencordInstaller-GPL-3.0.txt"
+          @"
+          Iolite ${{ steps.versions.outputs.iolite_version }}
+          Vencord ${{ steps.versions.outputs.vencord_ref }}
+          Vencord Installer ${{ steps.versions.outputs.installer_version }}
+          Built $((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))
+          "@ | Set-Content "$payload/VERSION.txt"
+          Compress-Archive -Path "$payload/*" -DestinationPath "$resources/runtime.zip" -CompressionLevel Optimal
+          (Get-FileHash "$resources/runtime.zip" -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content "$resources/runtime.sha256" -NoNewline
+          Copy-Item VencordInstallerCli.exe "$resources/VencordInstallerCli.exe"
+          "${{ steps.versions.outputs.iolite_version }}" | Set-Content "$resources/version.txt" -NoNewline
+
+      - name: Build self-contained installer
+        shell: pwsh
+        run: |
+          dotnet publish iolite/installer/Iolite.Installer/Iolite.Installer.csproj -c Release -r win-x64 -o installer-publish
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $name = "IoliteSetup-v${{ steps.versions.outputs.iolite_version }}-win-x64.exe"
+          Copy-Item installer-publish/IoliteSetup.exe "artifacts/$name"
+          (Get-FileHash "artifacts/$name" -Algorithm SHA256).Hash.ToLowerInvariant() + "  " + $name | Set-Content "artifacts/$name.sha256"
+
+      - name: Test embedded payload without modifying Discord
+        shell: pwsh
+        run: |
+          $testRoot = Join-Path $env:RUNNER_TEMP "iolite-extract-test"
+          $process = Start-Process -FilePath "artifacts/IoliteSetup-v${{ steps.versions.outputs.iolite_version }}-win-x64.exe" -ArgumentList @("--extract-only", $testRoot) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer extract-only test failed with $($process.ExitCode)" }
+          if (-not (Test-Path "$testRoot/dist/patcher.js")) { throw "Installer payload is incomplete" }
+
+      - name: Archive corresponding source
+        shell: pwsh
+        run: |
+          git -C iolite archive --format=zip --output="../artifacts/Iolite-source-v${{ steps.versions.outputs.iolite_version }}.zip" HEAD
+          git -C Vencord archive --format=zip --output="../artifacts/Vencord-source-${{ steps.versions.outputs.vencord_ref }}.zip" HEAD
+          git -C VencordInstaller archive --format=zip --output="../artifacts/VencordInstaller-source-${{ steps.versions.outputs.installer_version }}.zip" HEAD
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Iolite-Windows-${{ steps.versions.outputs.iolite_version }}
+          path: artifacts/*
+
+      - name: Create private GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME artifacts/* --repo $env:GITHUB_REPOSITORY --verify-tag --generate-notes --title "Iolite $env:GITHUB_REF_NAME"

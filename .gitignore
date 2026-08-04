@@ -7,3 +7,7 @@ node_modules/
 .idea/
 settings.json
 Vencord-backup-*/
+installer/Iolite.Installer/Resources/
+installer/Iolite.Installer/bin/
+installer/Iolite.Installer/obj/
+installer/artifacts/

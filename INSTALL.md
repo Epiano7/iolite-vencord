@@ -2,6 +2,37 @@
 
 Iolite is a private custom Vencord plugin. It is not included with standard Vencord, so it must be placed in a Vencord source checkout and compiled with Vencord.
 
+## Recommended Windows installation
+
+For Windows x64 users who have no other source-only custom plugins:
+
+1. Open the private [Iolite Releases page](https://github.com/Epiano7/iolite-vencord/releases).
+2. Download the newest `IoliteSetup-v...-win-x64.exe` and its `.sha256` file.
+3. Fully close Discord from the system tray.
+4. Run the installer and confirm the installation.
+5. Open **Discord Settings → Vencord → Plugins**, search for **Iolite**, and enable it.
+
+The installer contains a pinned Iolite/Vencord combination that passed the repository's compatibility checks. It backs up existing Vencord settings, installs its managed runtime under `%LOCALAPPDATA%\Iolite\Vencord`, and does not require Git, Node.js, or pnpm.
+
+The executable is currently unsigned, so Windows SmartScreen may identify it as coming from an unknown publisher. Confirm that its SHA-256 hash matches the release's `.sha256` file before running it.
+
+### Updating the managed installation
+
+When a new Iolite release is available, download and run its newer installer. It replaces the managed runtime as one tested unit while preserving settings and retaining a rollback copy. Vencord's normal updater is disabled in this build so that an official update cannot replace Iolite unexpectedly.
+
+### Repairing or uninstalling
+
+Run the installer from PowerShell or Command Prompt with one of these options:
+
+```powershell
+.\IoliteSetup-v0.3.0-win-x64.exe --repair
+.\IoliteSetup-v0.3.0-win-x64.exe --uninstall
+```
+
+Uninstalling removes the managed runtime but keeps Vencord settings and backups. Installers are currently distributed through the private repository, so every user still needs repository access.
+
+If you already compile other custom Vencord plugins, use the manual source instructions below. A prebuilt Iolite release cannot include unknown plugins from your personal source checkout.
+
 ## Before you begin
 
 You need:
@@ -187,4 +218,3 @@ pnpm build
 ```
 
 Use pnpm for the Vencord checkout rather than npm or Yarn.
-
