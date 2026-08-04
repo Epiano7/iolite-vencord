@@ -282,6 +282,7 @@ interface Preset {
 
 let activeProfileTarget: ActiveProfileTarget | null = null;
 let pendingWarnLookup: PendingWarnLookup | null = null;
+let warnLookupTimeout: number | null = null;
 let quickPanelContainer: HTMLDivElement | null = null;
 let quickPanelRoot: Root | null = null;
 
@@ -290,6 +291,12 @@ function closeQuickPanel() {
     quickPanelContainer?.remove();
     quickPanelRoot = null;
     quickPanelContainer = null;
+}
+
+function clearPendingWarnLookup() {
+    pendingWarnLookup = null;
+    if (warnLookupTimeout != null) window.clearTimeout(warnLookupTimeout);
+    warnLookupTimeout = null;
 }
 
 function getDefaultDestination(guildId: string): Destination {
@@ -414,15 +421,25 @@ async function viewWarns(user: User, guildId: string, channel?: Channel) {
 
     const isBackgroundLookup = destinationId !== SelectedChannelStore.getChannelId();
     if (settings.store.showWarnResponses && isBackgroundLookup) {
+        clearPendingWarnLookup();
         pendingWarnLookup = {
             channelId: destinationId,
             expiresAt: Date.now() + 20_000,
             user
         };
+        const lookup = pendingWarnLookup;
+        warnLookupTimeout = window.setTimeout(() => {
+            if (pendingWarnLookup !== lookup) return;
+            clearPendingWarnLookup();
+            showToast(
+                "Iolite did not detect Sapphire's response. Configure Sapphire Bot ID if the bot has a different name.",
+                Toasts.Type.FAILURE
+            );
+        }, 20_000);
     }
 
     const sent = await submitCommand(destinationId, buildCommand(guildId, "warns", user.id));
-    if (!sent) pendingWarnLookup = null;
+    if (!sent) clearPendingWarnLookup();
 }
 
 function makeQuickItems(user: User, guildId: string, channel?: Channel): ReactElement[] {
@@ -496,11 +513,62 @@ function extractSapphireResponse(message: Message): string {
     return [message.content, ...embedText].filter(Boolean).join("\n").trim();
 }
 
+function normalizeEmbedMedia(media: any) {
+    if (!media) return undefined;
+    return {
+        ...media,
+        proxyURL: media.proxyURL ?? media.proxy_url,
+        placeholderVersion: media.placeholderVersion ?? media.placeholder_version,
+        contentType: media.contentType ?? media.content_type,
+        srcIsAnimated: media.srcIsAnimated ?? false
+    };
+}
+
+function normalizeSapphireEmbed(embed: any) {
+    if (!embed) return undefined;
+
+    const numericColor = typeof embed.color === "number"
+        ? embed.color
+        : /^\d+$/.test(embed.color ?? "")
+            ? Number(embed.color)
+            : undefined;
+    const color = numericColor == null
+        ? embed.color
+        : `#${(numericColor & 0xffffff).toString(16).padStart(6, "0")}`;
+
+    return {
+        ...embed,
+        rawTitle: embed.rawTitle ?? embed.title ?? "",
+        rawDescription: embed.rawDescription ?? embed.description ?? "",
+        color,
+        timestamp: typeof embed.timestamp === "string" ? new Date(embed.timestamp) : embed.timestamp,
+        author: embed.author && {
+            ...embed.author,
+            iconURL: embed.author.iconURL ?? embed.author.icon_url,
+            iconProxyURL: embed.author.iconProxyURL ?? embed.author.proxy_icon_url
+        },
+        footer: embed.footer && {
+            ...embed.footer,
+            iconURL: embed.footer.iconURL ?? embed.footer.icon_url,
+            iconProxyURL: embed.footer.iconProxyURL ?? embed.footer.proxy_icon_url
+        },
+        thumbnail: normalizeEmbedMedia(embed.thumbnail),
+        image: normalizeEmbedMedia(embed.image),
+        images: embed.images?.map(normalizeEmbedMedia),
+        video: normalizeEmbedMedia(embed.video),
+        fields: (embed.fields ?? []).map((field: any) => ({
+            ...field,
+            rawName: field.rawName ?? field.name ?? "",
+            rawValue: field.rawValue ?? field.value ?? ""
+        }))
+    };
+}
+
 function handleMessageCreate({ message, optimistic }: { message: Message; optimistic: boolean; }) {
     const lookup = pendingWarnLookup;
     if (!lookup || optimistic) return;
     if (Date.now() > lookup.expiresAt) {
-        pendingWarnLookup = null;
+        clearPendingWarnLookup();
         return;
     }
     if (message.channel_id !== lookup.channelId || !message.author?.bot) return;
@@ -511,8 +579,8 @@ function handleMessageCreate({ message, optimistic }: { message: Message; optimi
         : message.author.username.toLowerCase().includes("sapphire");
     if (!isSapphire) return;
 
-    pendingWarnLookup = null;
-    const sapphireEmbed = message.embeds?.[0];
+    clearPendingWarnLookup();
+    const sapphireEmbed = normalizeSapphireEmbed(message.embeds?.[0]);
     showNotification({
         title: `Sapphire warns · ${lookup.user.username}`,
         body: extractSapphireResponse(message) || "Sapphire responded without text.",
@@ -642,7 +710,7 @@ export default definePlugin({
     stop() {
         window.removeEventListener("keydown", onPresetKeyDown, true);
         activeProfileTarget = null;
-        pendingWarnLookup = null;
+        clearPendingWarnLookup();
         closeQuickPanel();
     }
 });

@@ -9,6 +9,7 @@ All notable changes to Iolite will be documented here.
 - Replaced punishment submenus with a non-blocking floating editor.
 - Added persistent on-screen Sapphire responses for background warning lookups.
 - Rendered background warning responses using Sapphire's original Discord embed.
+- Normalized raw gateway embeds for Discord's renderer and added feedback when no Sapphire reply is detected.
 - Added an `Iolite -` marker to every plugin-owned user-menu row.
 - Added three configurable profile-targeted keyboard presets.
 
