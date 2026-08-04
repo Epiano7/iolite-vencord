@@ -13,13 +13,12 @@ import {
     ChannelStore,
     ContextMenuApi,
     Menu,
-    React,
     SelectedChannelStore,
     showToast,
     Toasts,
-    UserStore,
-    useState
+    UserStore
 } from "@webpack/common";
+import type { ReactElement } from "react";
 
 type PunishmentCommand = "ban" | "kick" | "mute" | "warn";
 type Destination = "current" | "private";
@@ -123,7 +122,7 @@ async function submitCommand(channelId: string | undefined, command: string) {
     }
 }
 
-function TextControl({ id, label, placeholder, value, onChange }: {
+function makeTextControl({ id, label, placeholder, value, onChange }: {
     id: string;
     label: string;
     placeholder: string;
@@ -132,6 +131,7 @@ function TextControl({ id, label, placeholder, value, onChange }: {
 }) {
     return (
         <Menu.MenuControlItem
+            key={id}
             id={id}
             interactive
             label={label}
@@ -148,142 +148,132 @@ function TextControl({ id, label, placeholder, value, onChange }: {
     );
 }
 
-function DestinationItems({ destination, guildId, onChange }: {
-    destination: Destination;
-    guildId: string;
-    onChange(destination: Destination): void;
-}) {
-    const privateChannel = getPrivateChannel(guildId);
-
-    return (
-        <Menu.MenuItem id="vc-iolite-destination" label="Destination">
-            <Menu.MenuRadioItem
-                id="vc-iolite-destination-current"
-                group="vc-iolite-destination"
-                label="Current channel"
-                checked={destination === "current"}
-                action={() => onChange("current")}
-            />
-            <Menu.MenuRadioItem
-                id="vc-iolite-destination-private"
-                group="vc-iolite-destination"
-                label={privateChannel ? `#${privateChannel.name}` : "Private channel (not configured)"}
-                checked={destination === "private"}
-                disabled={!privateChannel}
-                action={() => onChange("private")}
-            />
-        </Menu.MenuItem>
-    );
-}
-
-function PunishmentComposer({ channel, command, guildId, user }: {
+function makePunishmentItems({ channel, command, guildId, user }: {
     channel?: Channel;
     command: PunishmentCommand;
     guildId: string;
     user: User;
 }) {
     const privateChannel = getPrivateChannel(guildId);
-    const initialDestination = settings.store.defaultToPrivateChannel && privateChannel ? "private" : "current";
-    const [destination, setDestination] = useState<Destination>(initialDestination);
-    const [duration, setDuration] = useState("");
-    const [reason, setReason] = useState("");
-    const [review, setReview] = useState(false);
-
+    const state = { duration: "", reason: "" };
     const supportsDuration = command !== "kick";
-    const output = buildCommand(guildId, command, user.id, supportsDuration ? duration : "", reason, review);
-    const destinationId = destination === "private"
-        ? privateChannel?.id
-        : getCurrentChannelId(channel);
+    const currentChannelId = getCurrentChannelId(channel);
+    const defaultDestination: Destination = settings.store.defaultToPrivateChannel && privateChannel
+        ? "private"
+        : "current";
 
-    return (
-        <>
-            {supportsDuration && (
-                <TextControl
-                    id={`vc-iolite-${command}-duration`}
-                    label="Duration (optional)"
-                    placeholder="e.g. 1h, 7d"
-                    value={duration}
-                    onChange={setDuration}
-                />
-            )}
-            <TextControl
-                id={`vc-iolite-${command}-reason`}
-                label="Reason (optional)"
-                placeholder="Moderation reason"
-                value={reason}
-                onChange={setReason}
-            />
-            <DestinationItems destination={destination} guildId={guildId} onChange={setDestination} />
-            <Menu.MenuCheckboxItem
-                id={`vc-iolite-${command}-review`}
-                label="Review with Sapphire (-r)"
-                checked={review}
-                action={() => setReview(!review)}
-            />
-            <Menu.MenuItem
-                id={`vc-iolite-${command}-preview`}
-                label={`Preview: ${output}`}
-                disabled
-            />
-            <Menu.MenuItem
-                id={`vc-iolite-${command}-submit`}
-                label={`Send ${command}`}
-                color={command === "ban" ? "danger" : undefined}
-                disabled={!destinationId}
-                action={() => void submitCommand(destinationId, output)}
-            />
-        </>
+    const getDestinationId = (destination: Destination) => destination === "private"
+        ? privateChannel?.id
+        : currentChannelId;
+    const send = (destination: Destination, review: boolean) => void submitCommand(
+        getDestinationId(destination),
+        buildCommand(
+            guildId,
+            command,
+            user.id,
+            supportsDuration ? state.duration : "",
+            state.reason,
+            review
+        )
     );
+
+    const items: ReactElement[] = [];
+    if (supportsDuration) {
+        items.push(makeTextControl({
+            id: `vc-iolite-${command}-duration`,
+            label: "Duration (optional)",
+            placeholder: "e.g. 1h, 7d",
+            value: state.duration,
+            onChange: value => state.duration = value
+        }));
+    }
+
+    items.push(
+        makeTextControl({
+            id: `vc-iolite-${command}-reason`,
+            label: "Reason (optional)",
+            placeholder: "Moderation reason",
+            value: state.reason,
+            onChange: value => state.reason = value
+        }),
+        <Menu.MenuItem
+            key={`vc-iolite-${command}-send`}
+            id={`vc-iolite-${command}-send`}
+            label={`Send ${command}`}
+            color={command === "ban" ? "danger" : undefined}
+            disabled={!getDestinationId(defaultDestination)}
+            action={() => send(defaultDestination, false)}
+        />,
+        <Menu.MenuItem
+            key={`vc-iolite-${command}-more`}
+            id={`vc-iolite-${command}-more`}
+            label="More send options"
+        >
+            <Menu.MenuItem
+                id={`vc-iolite-${command}-current`}
+                label="Send to current channel"
+                disabled={!currentChannelId}
+                action={() => send("current", false)}
+            />
+            <Menu.MenuItem
+                id={`vc-iolite-${command}-private`}
+                label={privateChannel ? `Send to #${privateChannel.name}` : "Private channel not configured"}
+                disabled={!privateChannel}
+                action={() => send("private", false)}
+            />
+            <Menu.MenuItem
+                id={`vc-iolite-${command}-review`}
+                label="Send for Sapphire review (-r)"
+                disabled={!getDestinationId(defaultDestination)}
+                action={() => send(defaultDestination, true)}
+            />
+        </Menu.MenuItem>
+    );
+
+    return items;
 }
 
-function GuildConfiguration({ guildId }: { guildId: string; }) {
+function makeGuildConfigurationItems(guildId: string) {
     const config = getGuildConfig(guildId);
-    const [prefix, setPrefix] = useState(config.prefix ?? settings.store.defaultPrefix);
-    const [privateChannelId, setPrivateChannelId] = useState(config.privateChannelId ?? "");
-
-    function changePrefix(value: string) {
-        setPrefix(value);
-        updateGuildConfig(guildId, { prefix: value });
-    }
-
-    function changePrivateChannel(value: string) {
-        const digitsOnly = value.replace(/\D/g, "");
-        setPrivateChannelId(digitsOnly);
-        updateGuildConfig(guildId, { privateChannelId: digitsOnly });
-    }
-
+    let prefix = config.prefix ?? settings.store.defaultPrefix;
+    let privateChannelId = config.privateChannelId ?? "";
     const configuredChannel = getPrivateChannel(guildId);
 
-    return (
-        <>
-            <TextControl
-                id="vc-iolite-config-prefix"
-                label="Prefix for this server"
-                placeholder="e.g. ?, !, s!"
-                value={prefix}
-                onChange={changePrefix}
-            />
-            <TextControl
-                id="vc-iolite-config-channel"
-                label="Private moderation channel ID"
-                placeholder="Right-click channel → Copy Channel ID"
-                value={privateChannelId}
-                onChange={changePrivateChannel}
-            />
-            <Menu.MenuItem
-                id="vc-iolite-config-channel-status"
-                label={configuredChannel
-                    ? `Private destination: #${configuredChannel.name}`
-                    : privateChannelId
-                        ? "Private channel ID is not from this server"
-                        : "No private destination configured"}
-                disabled
-            />
-        </>
-    );
+    return [
+        makeTextControl({
+            id: "vc-iolite-config-prefix",
+            label: "Prefix for this server",
+            placeholder: "e.g. ?, !, s!",
+            value: prefix,
+            onChange: value => {
+                prefix = value;
+                updateGuildConfig(guildId, { prefix: value });
+            }
+        }),
+        makeTextControl({
+            id: "vc-iolite-config-channel",
+            label: "Private moderation channel ID",
+            placeholder: "Right-click channel → Copy Channel ID",
+            value: privateChannelId,
+            onChange: value => {
+                privateChannelId = value.replace(/\D/g, "");
+                updateGuildConfig(guildId, { privateChannelId });
+            }
+        }),
+        <Menu.MenuItem
+            key="vc-iolite-config-channel-status"
+            id="vc-iolite-config-channel-status"
+            label={configuredChannel
+                ? `Private destination: #${configuredChannel.name}`
+                : privateChannelId
+                    ? "Private channel ID is not from this server"
+                    : "No private destination configured"}
+            disabled
+        />
+    ];
 }
 
-function IoliteMenu({ channel, guildId, user }: {
+function makeIoliteMenu({ channel, guildId, user }: {
     channel?: Channel;
     guildId: string;
     user: User;
@@ -303,7 +293,7 @@ function IoliteMenu({ channel, guildId, user }: {
                     label={command[0].toUpperCase() + command.slice(1)}
                     color={command === "ban" ? "danger" : undefined}
                 >
-                    <PunishmentComposer channel={channel} command={command} guildId={guildId} user={user} />
+                    {makePunishmentItems({ channel, command, guildId, user })}
                 </Menu.MenuItem>
             ))}
             <Menu.MenuItem
@@ -317,7 +307,7 @@ function IoliteMenu({ channel, guildId, user }: {
             />
             <Menu.MenuSeparator />
             <Menu.MenuItem id="vc-iolite-config" label="Configure this server">
-                <GuildConfiguration guildId={guildId} />
+                {makeGuildConfigurationItems(guildId)}
             </Menu.MenuItem>
         </Menu.MenuItem>
     );
@@ -326,13 +316,15 @@ function IoliteMenu({ channel, guildId, user }: {
 const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: UserContextProps) => {
     if (!props.guildId || !props.user) return;
 
-    children.push(
-        IoliteMenu({
-            channel: props.channel,
-            guildId: props.guildId,
-            user: props.user
-        })
-    );
+    children.splice(-1, 0, (
+        <Menu.MenuGroup>
+            {makeIoliteMenu({
+                channel: props.channel,
+                guildId: props.guildId,
+                user: props.user
+            })}
+        </Menu.MenuGroup>
+    ));
 };
 
 const author = {
