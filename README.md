@@ -1,5 +1,7 @@
 # Iolite
 
+**Pronounced:** “EYE-uh-lite”
+
 Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sapph.xyz) commands. It provides fast moderation actions without opening a screen-blocking modal.
 
 > [!IMPORTANT]
