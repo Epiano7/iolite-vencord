@@ -18,6 +18,16 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 - Store a different Sapphire prefix for each server.
 - Add Sapphire's `-r` punishment-review flag.
 
+## Screenshots
+
+| Fast actions | Background warning lookup |
+| --- | --- |
+| <img src="docs/images/action-menu.png" alt="Iolite actions in Discord's user context menu" width="242"> | <img src="docs/images/warning-card-susbusamogus.png" alt="Iolite displaying Sapphire's warning response on screen" width="416"> |
+| Plugin settings | Keyboard preset settings |
+| <img src="docs/images/plugin-settings-redacted.png" alt="Iolite's Vencord plugin settings" width="620"> | <img src="docs/images/shortcut-settings.png" alt="Iolite's configurable profile shortcut settings" width="620"> |
+
+The screenshots redact private identifiers and avatars. `susbusamogus` is a consented demo account.
+
 ## Supported Sapphire commands
 
 Iolite follows Sapphire's [official moderation command reference](https://docs.sapph.xyz/#/moderation?id=commands-overview):
