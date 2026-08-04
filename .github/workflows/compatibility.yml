@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Iolite
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: iolite
 
       - name: Check out Vencord
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Vendicated/Vencord
           path: Vencord
