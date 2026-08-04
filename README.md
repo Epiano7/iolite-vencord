@@ -44,17 +44,17 @@ Sapphire supports server-defined prefixes. Iolite defaults to `?`, and the prefi
 
 ## Plugin Browser and installation
 
-Iolite does not appear as a discoverable plugin in a standard Vencord installation. Once it has been added to Vencord's source and compiled, it appears in **Settings → Vencord → Plugins** on that custom installation and can be enabled normally.
+Iolite does not appear as a discoverable plugin in a standard Vencord installation. After the Windows installer or a manual source build adds it, Iolite appears in **Settings → Vencord → Plugins** and can be enabled normally.
 
 The [full installation guide](INSTALL.md) covers:
 
-- installing the pinned Windows release with one executable and no development tools;
+- installing the Windows release into standard or source-built Vencord;
 - installing Vencord and Iolite from scratch;
 - moving from normal/prebuilt Vencord without intentionally losing existing plugin settings;
 - adding Iolite alongside other custom plugins;
 - Vesktop, updates, removal, and troubleshooting.
 
-For most Windows users, the recommended route is the latest `IoliteSetup-...exe` from the public [Releases page](https://github.com/Epiano7/iolite-vencord/releases). Source/custom-plugin users should follow the manual guide so their other custom plugins remain compiled into Vencord.
+For most Windows users, the recommended route is the latest `IoliteSetup-...exe` from the public [Releases page](https://github.com/Epiano7/iolite-vencord/releases). It uses a managed runtime for standard Vencord, or detects an active source build and compiles Iolite beside its existing user plugins. Source integration requires Node.js and pnpm; the manual guide remains available when the automatic source path cannot be used.
 
 ## Configuration
 

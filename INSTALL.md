@@ -1,37 +1,48 @@
 # Installing Iolite
 
-Iolite is a custom Vencord plugin. It is not included with standard Vencord. The managed Windows installer includes a pinned Vencord build; manual installations place Iolite in a Vencord source checkout and compile it with Vencord.
+Iolite is a custom Vencord plugin. It is not included with standard Vencord. The Windows installer supports both standard Vencord and existing source-built installations; manual source instructions are also provided.
 
 ## Recommended Windows installation
 
-For Windows x64 users who have no other source-only custom plugins:
+For Windows x64 Discord Desktop users:
 
 1. Open the public [Iolite Releases page](https://github.com/Epiano7/iolite-vencord/releases).
 2. Download the newest `IoliteSetup-v...-win-x64.exe` and its `.sha256` file.
 3. Fully close Discord from the system tray.
-4. Run the installer and confirm the installation.
+4. Run the installer, select **Install**, and leave its progress window open until it reports completion.
 5. Open **Discord Settings → Vencord → Plugins**, search for **Iolite**, and enable it.
 
-The installer contains a pinned Iolite/Vencord combination that passed the repository's compatibility checks. It backs up existing Vencord settings, installs its managed runtime under `%LOCALAPPDATA%\Iolite\Vencord`, and does not require Git, Node.js, or pnpm.
+The installer selects a safe mode automatically:
+
+| Existing installation | Installer behavior |
+| --- | --- |
+| No Vencord or standard/prebuilt Vencord | Installs the pinned, compatibility-tested runtime under `%LOCALAPPDATA%\Iolite\Vencord`. No development tools are required. |
+| Active source-built Vencord | Adds Iolite under that checkout's `src\userplugins`, preserves every sibling user plugin, backs up the old compiled `dist`, rebuilds everything together, and keeps the same checkout active. Node.js 22+ and pnpm must be available. |
+| Independently managed Iolite checkout with different local source | Stops before overwriting anything and directs the user to update manually. |
+
+Source-build rollback copies are stored under `%LOCALAPPDATA%\Iolite\SourceBackups`. If dependency installation, validation, compilation, or injection fails, the previous compiled `dist` and prior Iolite files are restored.
+
+> [!WARNING]
+> The v0.3.1 installer was withdrawn because it could replace an active source-built runtime and make its other custom plugins disappear from Discord. Use v0.3.2 or newer.
 
 The executable is currently unsigned, so Windows SmartScreen may identify it as coming from an unknown publisher. Confirm that its SHA-256 hash matches the release's `.sha256` file before running it.
 
-### Updating the managed installation
+### Updating an installation
 
-When a new Iolite release is available, download and run its newer installer. It replaces the managed runtime as one tested unit while preserving settings and retaining a rollback copy. Vencord's normal updater is disabled in this build so that an official update cannot replace Iolite unexpectedly.
+When a new Iolite release is available, download and run its newer installer. Managed installations replace the pinned runtime as one tested unit. Installer-managed source integrations update only Iolite's files and rebuild the existing checkout with its other plugins. Independently Git-managed Iolite checkouts should be updated with `git pull` and rebuilt manually.
 
 ### Repairing or uninstalling
 
 Run the installer from PowerShell or Command Prompt with one of these options:
 
 ```powershell
-.\IoliteSetup-v0.3.1-win-x64.exe --repair
-.\IoliteSetup-v0.3.1-win-x64.exe --uninstall
+.\IoliteSetup-v0.3.2-win-x64.exe --repair
+.\IoliteSetup-v0.3.2-win-x64.exe --uninstall
 ```
 
-Uninstalling removes the managed runtime but keeps Vencord settings and backups. Releases are publicly downloadable without a GitHub account.
+For a managed installation, uninstalling removes the managed runtime. For an installer-managed source integration, it moves Iolite into a rollback backup and rebuilds the same checkout with every other user plugin still present. Vencord settings and backups are kept in both modes.
 
-If you already compile other custom Vencord plugins, use the manual source instructions below. A prebuilt Iolite release cannot include unknown plugins from your personal source checkout.
+The manual source instructions below remain useful for Vesktop, non-Windows systems, locally modified Iolite checkouts, or source environments without the required toolchain.
 
 ## Before you begin
 

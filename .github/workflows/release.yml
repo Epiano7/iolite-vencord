@@ -140,6 +140,51 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Installer extract-only test failed with $($process.ExitCode)" }
           if (-not (Test-Path "$testRoot/dist/patcher.js")) { throw "Installer payload is incomplete" }
 
+      - name: Test source-build preservation guards
+        shell: pwsh
+        run: |
+          $sourceRoot = Join-Path $env:RUNNER_TEMP "iolite-source-fixture"
+          $otherPlugin = Join-Path $sourceRoot "src/userplugins/existing-plugin"
+          $resources = Join-Path $env:RUNNER_TEMP "discord-fixture/resources"
+          New-Item -ItemType Directory -Force "$sourceRoot/dist", $otherPlugin, $resources | Out-Null
+          "must remain unchanged" | Set-Content "$otherPlugin/keep.txt" -NoNewline
+
+          $patcher = (Join-Path $sourceRoot "dist/patcher.js").Replace("\", "\\")
+          [IO.File]::WriteAllText((Join-Path $resources "app.asar"), "require(`"$patcher`")")
+          $installer = "artifacts/IoliteSetup-v${{ steps.versions.outputs.iolite_version }}-win-x64.exe"
+
+          $guard = Start-Process -FilePath $installer -ArgumentList @("--self-test-source-guard", (Join-Path $resources "app.asar")) -Wait -PassThru
+          if ($guard.ExitCode -ne 0) { throw "Source loader guard did not detect the custom Vencord checkout" }
+
+          $preservation = Start-Process -FilePath $installer -ArgumentList @("--self-test-source-preservation", $sourceRoot) -Wait -PassThru
+          if ($preservation.ExitCode -ne 0) { throw "Source integration changed an existing user plugin" }
+          if ((Get-Content "$otherPlugin/keep.txt" -Raw) -ne "must remain unchanged") { throw "Existing user plugin fixture changed" }
+          if (-not (Test-Path "$sourceRoot/src/userplugins/iolite/index.tsx")) { throw "Iolite source was not installed beside the fixture plugin" }
+
+          $rollbackRoot = Join-Path $env:RUNNER_TEMP "iolite-rollback-fixture"
+          New-Item -ItemType Directory -Force "$rollbackRoot/src/userplugins/existing-plugin", "$rollbackRoot/dist" | Out-Null
+          "must survive rollback" | Set-Content "$rollbackRoot/src/userplugins/existing-plugin/keep.txt" -NoNewline
+          "previous runtime" | Set-Content "$rollbackRoot/dist/renderer.js" -NoNewline
+          $rollback = Start-Process -FilePath $installer -ArgumentList @("--self-test-source-rollback", $rollbackRoot) -Wait -PassThru
+          if ($rollback.ExitCode -ne 0) { throw "Source integration rollback did not restore the previous runtime" }
+          if ((Get-Content "$rollbackRoot/src/userplugins/existing-plugin/keep.txt" -Raw) -ne "must survive rollback") { throw "Rollback changed a sibling user plugin" }
+          if ((Get-Content "$rollbackRoot/dist/renderer.js" -Raw) -ne "previous runtime") { throw "Rollback did not restore the previous dist" }
+
+          $pnpm = Start-Process -FilePath $installer -ArgumentList @("--self-test-pnpm", (Resolve-Path "Vencord")) -Wait -PassThru
+          if ($pnpm.ExitCode -ne 0) {
+            Get-Content (Join-Path $env:RUNNER_TEMP "IoliteInstaller-self-test.log") -ErrorAction SilentlyContinue
+            throw "Installer could not invoke pnpm for source-build integration"
+          }
+
+          $sourceBuild = Start-Process -FilePath $installer -ArgumentList @("--self-test-source-build", (Resolve-Path "Vencord")) -Wait -PassThru
+          if ($sourceBuild.ExitCode -ne 0) {
+            Get-Content (Join-Path $env:RUNNER_TEMP "IoliteInstaller-self-test.log") -ErrorAction SilentlyContinue
+            throw "Installer could not rebuild a detected source checkout"
+          }
+
+          $ui = Start-Process -FilePath $installer -ArgumentList "--ui-smoke-test" -Wait -PassThru
+          if ($ui.ExitCode -ne 0) { throw "Installer progress window smoke test failed" }
+
       - name: Archive corresponding source
         shell: pwsh
         run: |

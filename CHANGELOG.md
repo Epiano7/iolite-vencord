@@ -2,6 +2,14 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.3.2 - 2026-08-04
+
+- Replaced transient confirmation boxes with a persistent installer window showing progress, errors, and an explicit completion screen.
+- Added automatic source-build integration that compiles Iolite beside existing user plugins instead of replacing their active runtime.
+- Added rollback backups for the previous source-built `dist` and installer-managed Iolite files.
+- Added path-bound cleanup guards and automated tests proving sibling user plugins remain unchanged.
+- Withdrew the v0.3.1 Windows installer after its managed runtime could hide other source-only plugins from Discord.
+
 ## 0.3.1 - 2026-08-04
 
 - Prepared the repository, documentation, and installer messaging for public access.
