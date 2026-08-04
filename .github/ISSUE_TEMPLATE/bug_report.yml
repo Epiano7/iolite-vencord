@@ -1,0 +1,32 @@
+name: Bug report
+description: Report an Iolite crash or incorrect behavior
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include the action you took and what appeared on screen.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove tokens, private messages, and server/channel/user IDs before pasting logs.
+      render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed tokens, private messages, and private IDs from this report.
+          required: true
