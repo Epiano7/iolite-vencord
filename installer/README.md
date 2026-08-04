@@ -30,4 +30,3 @@ The custom build deliberately disables Vencord's normal updater. Updates are com
 - Version 1 supports Windows x64 Discord Desktop.
 - The executable is currently unsigned, so Windows SmartScreen may show an unknown-publisher warning.
 - Other source-only custom plugins are not compiled into the managed build. Those users should keep the manual source installation described in `INSTALL.md`.
-- The repository and its Releases are private. A user needs GitHub repository access to download an installer update.

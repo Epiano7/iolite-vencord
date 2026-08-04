@@ -7,6 +7,13 @@ node_modules/
 .idea/
 settings.json
 Vencord-backup-*/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 installer/Iolite.Installer/Resources/
 installer/Iolite.Installer/bin/
 installer/Iolite.Installer/obj/

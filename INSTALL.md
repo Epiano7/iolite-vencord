@@ -1,12 +1,12 @@
 # Installing Iolite
 
-Iolite is a private custom Vencord plugin. It is not included with standard Vencord, so it must be placed in a Vencord source checkout and compiled with Vencord.
+Iolite is a custom Vencord plugin. It is not included with standard Vencord. The managed Windows installer includes a pinned Vencord build; manual installations place Iolite in a Vencord source checkout and compile it with Vencord.
 
 ## Recommended Windows installation
 
 For Windows x64 users who have no other source-only custom plugins:
 
-1. Open the private [Iolite Releases page](https://github.com/Epiano7/iolite-vencord/releases).
+1. Open the public [Iolite Releases page](https://github.com/Epiano7/iolite-vencord/releases).
 2. Download the newest `IoliteSetup-v...-win-x64.exe` and its `.sha256` file.
 3. Fully close Discord from the system tray.
 4. Run the installer and confirm the installation.
@@ -25,11 +25,11 @@ When a new Iolite release is available, download and run its newer installer. It
 Run the installer from PowerShell or Command Prompt with one of these options:
 
 ```powershell
-.\IoliteSetup-v0.3.0-win-x64.exe --repair
-.\IoliteSetup-v0.3.0-win-x64.exe --uninstall
+.\IoliteSetup-v0.3.1-win-x64.exe --repair
+.\IoliteSetup-v0.3.1-win-x64.exe --uninstall
 ```
 
-Uninstalling removes the managed runtime but keeps Vencord settings and backups. Installers are currently distributed through the private repository, so every user still needs repository access.
+Uninstalling removes the managed runtime but keeps Vencord settings and backups. Releases are publicly downloadable without a GitHub account.
 
 If you already compile other custom Vencord plugins, use the manual source instructions below. A prebuilt Iolite release cannot include unknown plugins from your personal source checkout.
 
@@ -37,9 +37,7 @@ If you already compile other custom Vencord plugins, use the manual source instr
 
 You need:
 
-- Access to the private [`Epiano7/iolite-vencord`](https://github.com/Epiano7/iolite-vencord) repository. Ask the owner to add your GitHub account before trying to clone it.
 - [Git](https://git-scm.com/downloads)
-- [GitHub CLI](https://cli.github.com/) signed into the GitHub account that has access to Iolite
 - [Node.js](https://nodejs.org/) 22 or newer
 - [pnpm](https://pnpm.io/installation)
 - Discord Desktop or Vesktop on Windows, macOS, or Linux
@@ -63,24 +61,18 @@ After Iolite is added to the source and the custom build is installed, **Iolite 
 
 ## A. New Vencord installation
 
-1. Sign into GitHub CLI:
-
-   ```powershell
-   gh auth login
-   ```
-
-2. Clone Vencord and Iolite:
+1. Clone Vencord and Iolite:
 
    ```powershell
    git clone https://github.com/Vendicated/Vencord.git
    cd Vencord
    New-Item -ItemType Directory -Force -Path src\userplugins
    cd src\userplugins
-   gh repo clone Epiano7/iolite-vencord iolite
+   git clone https://github.com/Epiano7/iolite-vencord.git iolite
    cd ..\..
    ```
 
-3. Build Vencord and install it into Discord:
+2. Build Vencord and install it into Discord:
 
    ```powershell
    pnpm install --frozen-lockfile
@@ -88,7 +80,7 @@ After Iolite is added to the source and the custom build is installed, **Iolite 
    pnpm inject
    ```
 
-4. Follow the installer prompts, fully restart Discord, and complete [Enable and verify Iolite](#enable-and-verify-iolite).
+3. Follow the installer prompts, fully restart Discord, and complete [Enable and verify Iolite](#enable-and-verify-iolite).
 
 ## B. Move from prebuilt to a custom build
 
@@ -103,15 +95,14 @@ Your Vencord settings are normally kept separately from its compiled code, so mo
 
    Do not upload this backup. It can contain personal settings and server IDs.
 
-2. Sign into GitHub CLI, clone the source, and add Iolite:
+2. Clone the source and add Iolite:
 
    ```powershell
-   gh auth login
    git clone https://github.com/Vendicated/Vencord.git
    cd Vencord
    New-Item -ItemType Directory -Force -Path src\userplugins
    cd src\userplugins
-   gh repo clone Epiano7/iolite-vencord iolite
+   git clone https://github.com/Epiano7/iolite-vencord.git iolite
    cd ..\..
    ```
 
@@ -137,11 +128,10 @@ These steps preserve any other user plugins already under `src\userplugins`.
    cd src\userplugins
    ```
 
-2. Sign in and clone Iolite alongside your other custom plugins:
+2. Clone Iolite alongside your other custom plugins:
 
    ```powershell
-   gh auth login
-   gh repo clone Epiano7/iolite-vencord iolite
+   git clone https://github.com/Epiano7/iolite-vencord.git iolite
    cd ..\..
    ```
 
@@ -204,9 +194,9 @@ To return entirely to prebuilt Vencord, use the official Vencord installer to in
 - Rebuild, reinject, and fully restart Discord.
 - Seeing no public install button for Iolite in a standard Vencord build is expected.
 
-### GitHub says the repository does not exist or access is denied
+### Git cannot download Iolite
 
-The Iolite repository is private. Confirm that its owner granted your GitHub account access and that `gh auth status` shows the same account.
+Confirm that `https://github.com/Epiano7/iolite-vencord` opens in a browser, then retry the `git clone` command. A GitHub account is not required for a public clone.
 
 ### The build reports missing packages
 

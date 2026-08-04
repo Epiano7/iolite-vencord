@@ -1,6 +1,6 @@
 # Contributing
 
-Iolite is currently a private project. Changes should remain focused on its Sapphire moderation workflow.
+Iolite is an open-source project focused on its Sapphire moderation workflow.
 
 Maintainer updates may be committed directly to `main`. Changes from other contributors should use a focused pull request so they can be discussed, tested, and reviewed before merging.
 

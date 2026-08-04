@@ -2,6 +2,12 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.3.1 - 2026-08-04
+
+- Prepared the repository, documentation, and installer messaging for public access.
+- Replaced private-repository installation steps with public clone and download instructions.
+- Added preventative ignore rules for environment files and common private-key formats.
+
 ## 0.3.0 - 2026-08-04
 
 - Added a self-contained Windows x64 installer for pinned, tested Iolite/Vencord releases.

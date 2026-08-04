@@ -5,7 +5,7 @@
 Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sapph.xyz) commands. It provides fast moderation actions without opening a screen-blocking modal.
 
 > [!IMPORTANT]
-> Iolite is a private user plugin. It requires building Vencord from source and is not part of Vencord's approved built-in plugin collection. Client modifications are against Discord's Terms of Service; use them at your own discretion.
+> Iolite is a custom user plugin. It is not part of Vencord's approved built-in plugin collection. Manual installations require building Vencord from source, while the Windows release includes a pinned prebuilt Vencord runtime. Client modifications are against Discord's Terms of Service; use them at your own discretion.
 
 ## Features
 
@@ -44,9 +44,7 @@ The [full installation guide](INSTALL.md) covers:
 - adding Iolite alongside other custom plugins;
 - Vesktop, updates, removal, and troubleshooting.
 
-Because this repository is private, each installer must first be granted repository access through their GitHub account.
-
-For most Windows users, the recommended route is the latest `IoliteSetup-...exe` from the private [Releases page](https://github.com/Epiano7/iolite-vencord/releases). Source/custom-plugin users should follow the manual guide so their other custom plugins remain compiled into Vencord.
+For most Windows users, the recommended route is the latest `IoliteSetup-...exe` from the public [Releases page](https://github.com/Epiano7/iolite-vencord/releases). Source/custom-plugin users should follow the manual guide so their other custom plugins remain compiled into Vencord.
 
 ## Configuration
 

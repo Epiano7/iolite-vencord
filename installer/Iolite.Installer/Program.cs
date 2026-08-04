@@ -92,7 +92,7 @@ internal static class Program
             if (exitCode != 0) throw new InvalidOperationException($"The Vencord installer exited with code {exitCode}.");
 
             Show(
-                $"Iolite {version} was installed successfully.\n\nOpen Discord, enable Iolite in Settings → Vencord → Plugins, and restart Discord if prompted.\n\nFuture updates will appear as new installers in the private GitHub Releases page:\n{ReleaseUrl}",
+                $"Iolite {version} was installed successfully.\n\nOpen Discord, enable Iolite in Settings → Vencord → Plugins, and restart Discord if prompted.\n\nFuture updates will appear as new installers on the GitHub Releases page:\n{ReleaseUrl}",
                 MbOk | MbIconInformation
             );
             return 0;
