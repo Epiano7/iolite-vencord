@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest an improvement to Iolite's moderation workflow
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Explain the moderation situation and why the current workflow is slow or difficult.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior
+      description: Describe how you would like Iolite to behave.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety considerations
+      description: Note any risks involving accidental commands, destinations, permissions, or private moderation activity.
