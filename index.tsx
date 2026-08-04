@@ -10,6 +10,7 @@ import { definePluginSettings } from "@api/Settings";
 import { sendMessage } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import type { Channel, Message, User } from "@vencord/discord-types";
+import { findComponentLazy } from "@webpack";
 import {
     ChannelStore,
     ContextMenuApi,
@@ -41,6 +42,8 @@ const DESTINATION_OPTIONS = [
     { label: "Current channel", value: "current", default: true },
     { label: "Private moderation channel", value: "private" }
 ] as const;
+
+const NativeMessageEmbed = findComponentLazy<any>(module => module.prototype?.renderSuppressButton);
 
 interface GuildConfig {
     prefix?: string;
@@ -427,7 +430,7 @@ function makeQuickItems(user: User, guildId: string, channel?: Channel): ReactEl
         <Menu.MenuItem
             id={`vc-iolite-${command}`}
             key={`vc-iolite-${command}`}
-            label={command[0].toUpperCase() + command.slice(1)}
+            label={`Iolite - ${command[0].toUpperCase() + command.slice(1)}`}
             color={command === "ban" ? "danger" : undefined}
             action={() => openQuickPanel(command, user, guildId, channel)}
         />
@@ -437,13 +440,13 @@ function makeQuickItems(user: User, guildId: string, channel?: Channel): ReactEl
         <Menu.MenuItem
             id="vc-iolite-warns"
             key="vc-iolite-warns"
-            label="View Warns"
+            label="Iolite - View Warns"
             action={() => void viewWarns(user, guildId, channel)}
         />,
         <Menu.MenuItem
             id="vc-iolite-config"
             key="vc-iolite-config"
-            label="Iolite Server Settings"
+            label="Iolite - Server Settings"
         >
             {makeGuildConfigurationItems(guildId)}
         </Menu.MenuItem>
@@ -509,9 +512,15 @@ function handleMessageCreate({ message, optimistic }: { message: Message; optimi
     if (!isSapphire) return;
 
     pendingWarnLookup = null;
+    const sapphireEmbed = message.embeds?.[0];
     showNotification({
         title: `Sapphire warns · ${lookup.user.username}`,
         body: extractSapphireResponse(message) || "Sapphire responded without text.",
+        richBody: sapphireEmbed
+            ? <div style={{ maxHeight: "min(65vh, 640px)", overflow: "auto", width: "100%" }}>
+                <NativeMessageEmbed embed={sapphireEmbed} />
+            </div>
+            : undefined,
         permanent: true,
         color: "var(--brand-500)"
     });

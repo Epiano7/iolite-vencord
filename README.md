@@ -7,11 +7,11 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 
 ## Features
 
-- Warn, mute, kick, ban, and view warnings directly from a user's context menu—no Iolite dropdown.
+- Use clearly labeled **Iolite - Warn**, **Iolite - Mute**, **Iolite - Kick**, **Iolite - Ban**, and **Iolite - View Warns** rows directly from a user's context menu—no Iolite dropdown.
 - Optionally replace **Start a Call** and **Add Note** with the fast moderation rows.
 - Enter a reason and optional duration in a small floating editor while the rest of Discord stays usable.
 - Send to the current channel or a configured private moderation channel.
-- Show Sapphire's warnings response as a persistent in-app notification when the command runs elsewhere.
+- Show Sapphire's original warnings embed as a persistent in-app card when the command runs elsewhere.
 - Configure three keyboard presets with an action, duration, reason, destination, and shortcut. Presets only work while a user's profile is open.
 - Store a different Sapphire prefix for each server.
 - Add Sapphire's `-r` punishment-review flag.
@@ -88,7 +88,7 @@ Restart Discord. Open **Settings → Vencord → Plugins**, search for **Iolite*
 
 ## Configuration
 
-Right-click a member inside a server and open **Iolite Server Settings**.
+Right-click a member inside a server and open **Iolite - Server Settings**.
 
 - **Prefix for this server:** Enter `?`, `!`, `s!`, or that server's configured Sapphire prefix.
 - **Private moderation channel ID:** Enable Discord Developer Mode, right-click the private channel, and select **Copy Channel ID**.
@@ -104,7 +104,7 @@ Left-click a member to open their profile, then press the configured shortcut. I
 
 ### Background warning lookups
 
-When **View Warns** sends to a channel other than the one currently open, Iolite waits for Sapphire's reply and shows it as a persistent in-app notification. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
+When **Iolite - View Warns** sends to a channel other than the one currently open, Iolite waits for Sapphire's reply and renders Sapphire's original embed in a persistent on-screen card, including its title, description, fields, color, images, and footer. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
 
 ## Updating
 

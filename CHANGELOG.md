@@ -8,6 +8,8 @@ All notable changes to Iolite will be documented here.
 - Added an option to replace Start a Call and Add Note with Iolite's fast actions.
 - Replaced punishment submenus with a non-blocking floating editor.
 - Added persistent on-screen Sapphire responses for background warning lookups.
+- Rendered background warning responses using Sapphire's original Discord embed.
+- Added an `Iolite -` marker to every plugin-owned user-menu row.
 - Added three configurable profile-targeted keyboard presets.
 
 ## 0.1.1 - 2026-08-04
