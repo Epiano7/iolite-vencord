@@ -12,9 +12,11 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 - Use clearly labeled **Iolite - Warn**, **Iolite - Mute**, **Iolite - Kick**, **Iolite - Ban**, and **Iolite - View Warns** rows directly from a user's context menu—no Iolite dropdown.
 - Optionally replace **Start a Call** and **Add Note** with the fast moderation rows.
 - Enter a reason and optional duration in a small floating editor while the rest of Discord stays usable.
+- Reuse the eight most recent successful ban and mute reasons from the matching moderation popup.
 - Send to the current channel or a configured private moderation channel.
 - Show Sapphire's original warnings embed as a persistent in-app card when the command runs elsewhere.
-- Configure three keyboard presets with an action, duration, reason, destination, and shortcut. Presets only work while a user's profile is open.
+- Configure three named presets with an action, duration, reason, destination, and shortcut. Matching presets also appear as buttons in moderation popups.
+- Customize the popup with one solid hex color or a two-color diagonal gradient.
 - Store a different Sapphire prefix for each server.
 - Add Sapphire's `-r` punishment-review flag.
 
@@ -68,9 +70,15 @@ Iolite verifies that the configured private destination belongs to the current s
 
 ### Keyboard presets
 
-Open Iolite's normal Vencord settings and configure **Preset 1**, **Preset 2**, or **Preset 3**. A shortcut can be a single key such as `1` or a combination such as `Ctrl+1`.
+Open Iolite's normal Vencord settings and configure the name, action, duration, reason, destination, and optional shortcut for **Preset 1**, **Preset 2**, or **Preset 3**. A shortcut can be a single key such as `1` or a combination such as `Ctrl+1`. Presets whose action matches the open moderation popup appear there as buttons; selecting one fills its duration, reason, and destination for review before sending.
 
 Left-click a member to open their profile, then press the configured shortcut. Iolite ignores preset shortcuts while you are typing in chat, a reason field, or another text input. A private preset fails safely instead of sending publicly when its private channel is unavailable.
+
+### Saved reasons and panel colors
+
+With **Remember Recent Reasons** enabled, Iolite stores the eight most recent successful ban reasons and eight most recent successful mute reasons locally in Vencord's settings. Use **Choose a recent reason…** in the matching popup to reuse one. Reasons are only remembered after Sapphire's command is sent successfully; use **Clear saved ban and mute reasons** to erase the history.
+
+Set **Quick Panel Color 1** to a six-digit hex color such as `#111214` for a solid popup. Set **Quick Panel Color 2** as well to create a diagonal two-color gradient. Invalid or empty values safely fall back to Iolite's standard Discord-like dark or light panel.
 
 ### Background warning lookups
 

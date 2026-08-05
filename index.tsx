@@ -7,6 +7,7 @@
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
+import { Button } from "@components/Button";
 import { sendMessage } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import type { Channel, Message, User } from "@vencord/discord-types";
@@ -26,7 +27,7 @@ import {
 import type { ReactElement } from "react";
 import type { Root } from "react-dom/client";
 
-import { QuickCommand, QuickDestination, QuickPanel, QuickPanelResult } from "./QuickPanel";
+import { QuickCommand, QuickDestination, QuickPanel, QuickPanelPreset, QuickPanelResult } from "./QuickPanel";
 
 type PunishmentCommand = "ban" | "kick" | "mute" | "warn";
 type Destination = "current" | "private";
@@ -46,6 +47,11 @@ const DESTINATION_OPTIONS = [
 interface GuildConfig {
     prefix?: string;
     privateChannelId?: string;
+}
+
+interface RecentReasons {
+    ban: string[];
+    mute: string[];
 }
 
 interface UserContextProps {
@@ -93,6 +99,40 @@ const settings = definePluginSettings({
         description: "Enable preset shortcuts while a user's profile is open",
         default: true
     },
+    rememberRecentReasons: {
+        type: OptionType.BOOLEAN,
+        description: "Remember the eight most recently sent ban and mute reasons for quick reuse",
+        default: true
+    },
+    clearRecentReasons: {
+        type: OptionType.COMPONENT,
+        component: () => (
+            <Button onClick={() => {
+                settings.store.recentReasons = { ban: [], mute: [] };
+                showToast("Iolite's saved ban and mute reasons were cleared.", Toasts.Type.SUCCESS);
+            }}>
+                Clear saved ban and mute reasons
+            </Button>
+        )
+    },
+    quickPanelColor1: {
+        type: OptionType.STRING,
+        description: "Optional quick-panel background color in #RRGGBB format",
+        placeholder: "#111214",
+        default: ""
+    },
+    quickPanelColor2: {
+        type: OptionType.STRING,
+        description: "Optional second #RRGGBB color; when set, the quick panel uses a diagonal gradient",
+        placeholder: "#5865F2",
+        default: ""
+    },
+    preset1Name: {
+        type: OptionType.STRING,
+        description: "Preset 1 name shown in moderation popups",
+        placeholder: "Preset 1",
+        default: "Preset 1"
+    },
     preset1Shortcut: {
         type: OptionType.STRING,
         description: "Preset 1 shortcut, such as 1 or Ctrl+1",
@@ -120,6 +160,12 @@ const settings = definePluginSettings({
         type: OptionType.SELECT,
         description: "Preset 1 destination",
         options: DESTINATION_OPTIONS
+    },
+    preset2Name: {
+        type: OptionType.STRING,
+        description: "Preset 2 name shown in moderation popups",
+        placeholder: "Preset 2",
+        default: "Preset 2"
     },
     preset2Shortcut: {
         type: OptionType.STRING,
@@ -153,6 +199,12 @@ const settings = definePluginSettings({
         type: OptionType.SELECT,
         description: "Preset 2 destination",
         options: DESTINATION_OPTIONS
+    },
+    preset3Name: {
+        type: OptionType.STRING,
+        description: "Preset 3 name shown in moderation popups",
+        placeholder: "Preset 3",
+        default: "Preset 3"
     },
     preset3Shortcut: {
         type: OptionType.STRING,
@@ -190,6 +242,10 @@ const settings = definePluginSettings({
     guildConfigs: {
         type: OptionType.CUSTOM,
         default: {} as Record<string, GuildConfig>
+    },
+    recentReasons: {
+        type: OptionType.CUSTOM,
+        default: { ban: [], mute: [] } as RecentReasons
     }
 });
 
@@ -274,6 +330,7 @@ interface Preset {
     command: PunishmentCommand;
     destination: Destination;
     duration: string;
+    name: string;
     reason: string;
     shortcut: string;
 }
@@ -315,6 +372,9 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
 
     quickPanelContainer = document.createElement("div");
     quickPanelContainer.id = "vc-iolite-quick-panel";
+    const containPanelEvent = (event: Event) => event.stopPropagation();
+    for (const eventName of ["beforeinput", "input", "keydown", "keypress", "keyup"])
+        quickPanelContainer.addEventListener(eventName, containPanelEvent);
     document.body.append(quickPanelContainer);
     const shadowRoot = quickPanelContainer.attachShadow({ mode: "closed" });
     const mountPoint = document.createElement("div");
@@ -322,12 +382,25 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
     quickPanelRoot = createRoot(mountPoint);
 
     const defaultDestination = getDefaultDestination(guildId) as QuickDestination;
+    const presets = ([1, 2, 3] as const)
+        .map(getPreset)
+        .filter(preset => preset.command === command && Boolean(preset.reason.trim() || preset.duration.trim()))
+        .map((preset): QuickPanelPreset => ({
+            name: preset.name.trim() || "Unnamed preset",
+            destination: preset.destination,
+            duration: preset.duration,
+            reason: preset.reason
+        }));
     quickPanelRoot.render(
         <QuickPanel
             command={command}
             defaultDestination={defaultDestination}
+            gradientColor1={normalizeHexColor(settings.store.quickPanelColor1)}
+            gradientColor2={normalizeHexColor(settings.store.quickPanelColor2)}
             hasPrivateChannel={Boolean(getPrivateChannel(guildId))}
             onClose={closeQuickPanel}
+            presets={presets}
+            recentReasons={getRecentReasons(command)}
             user={user}
             onSubmit={(result: QuickPanelResult) => {
                 const destinationId = getDestinationId(guildId, result.destination, channel);
@@ -337,13 +410,38 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
                 }
 
                 closeQuickPanel();
-                void submitCommand(
-                    destinationId,
-                    buildCommand(guildId, command, user.id, result.duration, result.reason, result.review)
-                );
+                void (async () => {
+                    const sent = await submitCommand(
+                        destinationId,
+                        buildCommand(guildId, command, user.id, result.duration, result.reason, result.review)
+                    );
+                    if (sent) rememberRecentReason(command, result.reason);
+                })();
             }}
         />
     );
+}
+
+function normalizeHexColor(value: string): string | undefined {
+    const trimmed = value.trim();
+    const normalized = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+    return /^#[\da-f]{6}$/i.test(normalized) ? normalized : undefined;
+}
+
+function getRecentReasons(command: QuickCommand): string[] {
+    if (!settings.store.rememberRecentReasons || (command !== "ban" && command !== "mute")) return [];
+    return settings.store.recentReasons[command] ?? [];
+}
+
+function rememberRecentReason(command: QuickCommand, reason: string) {
+    const normalized = reason.trim();
+    if (!settings.store.rememberRecentReasons || !normalized || (command !== "ban" && command !== "mute")) return;
+
+    const recent = settings.store.recentReasons;
+    settings.store.recentReasons = {
+        ...recent,
+        [command]: [normalized, ...(recent[command] ?? []).filter(saved => saved !== normalized)].slice(0, 8)
+    };
 }
 
 function makeTextControl({ id, label, placeholder, value, onChange }: {
@@ -618,6 +716,7 @@ function handleMessageCreate({ message, optimistic }: { message: Message; optimi
 function getPreset(index: 1 | 2 | 3): Preset {
     const store = settings.store as unknown as Record<string, string>;
     return {
+        name: store[`preset${index}Name`] ?? `Preset ${index}`,
         shortcut: store[`preset${index}Shortcut`] ?? "",
         command: (store[`preset${index}Command`] ?? "warn") as PunishmentCommand,
         duration: store[`preset${index}Duration`] ?? "",
@@ -647,7 +746,7 @@ function shortcutFromEvent(event: KeyboardEvent): string {
 }
 
 function onPresetKeyDown(event: KeyboardEvent) {
-    if (!settings.store.enableProfileShortcuts || !activeProfileTarget || event.repeat) return;
+    if (quickPanelContainer || !settings.store.enableProfileShortcuts || !activeProfileTarget || event.repeat) return;
     const { target } = event;
     if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable='true']")) return;
 

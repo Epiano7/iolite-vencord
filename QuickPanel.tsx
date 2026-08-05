@@ -5,7 +5,7 @@
  */
 
 import type { User } from "@vencord/discord-types";
-import { useEffect, useState } from "@webpack/common";
+import { useState } from "@webpack/common";
 
 export type QuickCommand = "ban" | "kick" | "mute" | "warn";
 export type QuickDestination = "current" | "private";
@@ -17,12 +17,23 @@ export interface QuickPanelResult {
     review: boolean;
 }
 
+export interface QuickPanelPreset {
+    destination: QuickDestination;
+    duration: string;
+    name: string;
+    reason: string;
+}
+
 interface QuickPanelProps {
     command: QuickCommand;
     defaultDestination: QuickDestination;
+    gradientColor1?: string;
+    gradientColor2?: string;
     hasPrivateChannel: boolean;
     onClose(): void;
     onSubmit(result: QuickPanelResult): void;
+    presets: QuickPanelPreset[];
+    recentReasons: string[];
     user: User;
 }
 
@@ -78,25 +89,43 @@ const buttonBaseStyle = {
     fontWeight: 600
 } as const;
 
+function hexLuminance(color: string): number {
+    const channels = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16) / 255)
+        .map(channel => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
 export function QuickPanel({
     command,
     defaultDestination,
+    gradientColor1,
+    gradientColor2,
     hasPrivateChannel,
     onClose,
     onSubmit,
+    presets,
+    recentReasons,
     user
 }: QuickPanelProps) {
     const [destination, setDestination] = useState<QuickDestination>(defaultDestination);
     const [duration, setDuration] = useState("");
     const [reason, setReason] = useState("");
     const [review, setReview] = useState(false);
-    const isLight = document.documentElement.classList.contains("theme-light")
-        || document.body.classList.contains("theme-light");
+    const customColors = [gradientColor1, gradientColor2].filter(Boolean) as string[];
+    const isLight = customColors.length
+        ? customColors.every(color => hexLuminance(color) > 0.45)
+        : document.documentElement.classList.contains("theme-light")
+            || document.body.classList.contains("theme-light");
     const palette = isLight ? lightPalette : darkPalette;
+    const customBackground = gradientColor1
+        ? gradientColor2
+            ? `linear-gradient(135deg, ${gradientColor1}, ${gradientColor2})`
+            : gradientColor1
+        : palette.background;
     const panelStyle = {
         ...panelBaseStyle,
         border: `1px solid ${palette.border}`,
-        backgroundColor: palette.background,
+        background: customBackground,
         boxShadow: isLight
             ? "0 8px 32px rgba(0, 0, 0, 0.24)"
             : "0 8px 32px rgba(0, 0, 0, 0.72)",
@@ -118,20 +147,26 @@ export function QuickPanel({
         fontSize: "14px"
     } as const;
 
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") onClose();
-        };
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, [onClose]);
-
     const supportsDuration = command !== "kick";
+    const applyPreset = (preset: QuickPanelPreset) => {
+        setDuration(preset.duration);
+        setReason(preset.reason);
+        if (preset.destination !== "private" || hasPrivateChannel) setDestination(preset.destination);
+    };
+    const containKeyboardEvent = (event: React.KeyboardEvent) => {
+        event.stopPropagation();
+        if (event.key === "Escape") onClose();
+    };
 
     return (
         <form
             aria-label={`Iolite ${command} ${user.username}`}
             style={panelStyle}
+            onKeyDown={containKeyboardEvent}
+            onKeyDownCapture={event => event.stopPropagation()}
+            onKeyUp={event => event.stopPropagation()}
+            onKeyUpCapture={event => event.stopPropagation()}
+            onKeyPress={event => event.stopPropagation()}
             onSubmit={event => {
                 event.preventDefault();
                 onSubmit({ destination, duration, reason, review });
@@ -156,6 +191,35 @@ export function QuickPanel({
                 </button>
             </div>
 
+            {presets.length > 0 && (
+                <div style={{ marginTop: "12px" }}>
+                    <div style={{ marginBottom: "6px", fontSize: "12px", fontWeight: 600 }}>Presets</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {presets.map((preset, index) => (
+                            <button
+                                key={`${preset.name}-${index}`}
+                                type="button"
+                                title={preset.reason || preset.duration || preset.name}
+                                onClick={() => applyPreset(preset)}
+                                style={{
+                                    border: `1px solid ${palette.border}`,
+                                    borderRadius: "4px",
+                                    padding: "6px 9px",
+                                    background: palette.button,
+                                    color: palette.text,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                    fontSize: "12px",
+                                    fontWeight: 600
+                                }}
+                            >
+                                {preset.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {supportsDuration && (
                 <div style={{ marginTop: "14px" }}>
                     <div style={{ marginBottom: "6px", fontSize: "12px", fontWeight: 600 }}>Duration (optional)</div>
@@ -170,6 +234,22 @@ export function QuickPanel({
 
             <div style={{ marginTop: "12px" }}>
                 <div style={{ marginBottom: "6px", fontSize: "12px", fontWeight: 600 }}>Reason (optional)</div>
+                {recentReasons.length > 0 && (
+                    <select
+                        aria-label="Recent reasons"
+                        defaultValue=""
+                        onChange={event => {
+                            if (event.currentTarget.value) setReason(event.currentTarget.value);
+                            event.currentTarget.value = "";
+                        }}
+                        style={{ ...inputStyle, minHeight: "34px", marginBottom: "6px", padding: "6px 10px" }}
+                    >
+                        <option value="">Choose a recent reason…</option>
+                        {recentReasons.map(savedReason => (
+                            <option key={savedReason} value={savedReason}>{savedReason}</option>
+                        ))}
+                    </select>
+                )}
                 <input
                     value={reason}
                     onChange={event => setReason(event.currentTarget.value)}

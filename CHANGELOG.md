@@ -2,6 +2,13 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.4.0 - 2026-08-05
+
+- Prevented quick-panel typing from leaking into Discord's channel message composer.
+- Remembers the eight most recent successful ban and mute reasons separately, exposes them in the matching popup, and provides a clear-history setting.
+- Added names to the three existing presets and shows matching presets as fast buttons in ban, mute, warn, and kick popups.
+- Added optional solid `#RRGGBB` or two-color diagonal-gradient quick-panel backgrounds with automatic light/dark foreground selection.
+
 ## 0.3.5 - 2026-08-04
 
 - Fixed a second **Patching Discord** delay caused by redirected pipe completion arriving long after the patcher process exited.
