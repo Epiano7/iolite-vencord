@@ -24,6 +24,24 @@ export interface QuickPanelPreset {
     reason: string;
 }
 
+export interface SapphireConfirmationChoice {
+    customId: string;
+    label: string;
+    style?: number;
+    type: number;
+}
+
+interface SapphireConfirmationPanelProps {
+    body: string;
+    choices: SapphireConfirmationChoice[];
+    gradientColor1?: string;
+    gradientColor2?: string;
+    onChoose(choice: SapphireConfirmationChoice): Promise<boolean>;
+    onClose(): void;
+    onOpenOriginal(): void;
+    user: User;
+}
+
 interface QuickPanelProps {
     command: QuickCommand;
     defaultDestination: QuickDestination;
@@ -95,6 +113,34 @@ function hexLuminance(color: string): number {
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
 }
 
+function getPanelTheme(gradientColor1?: string, gradientColor2?: string) {
+    const customColors = [gradientColor1, gradientColor2].filter(Boolean) as string[];
+    const isLight = customColors.length
+        ? customColors.every(color => hexLuminance(color) > 0.45)
+        : document.documentElement.classList.contains("theme-light")
+            || document.body.classList.contains("theme-light");
+    const palette = isLight ? lightPalette : darkPalette;
+    const background = gradientColor1
+        ? gradientColor2
+            ? `linear-gradient(135deg, ${gradientColor1}, ${gradientColor2})`
+            : gradientColor1
+        : palette.background;
+
+    return {
+        palette,
+        panelStyle: {
+            ...panelBaseStyle,
+            border: `1px solid ${palette.border}`,
+            background,
+            boxShadow: isLight
+                ? "0 8px 32px rgba(0, 0, 0, 0.24)"
+                : "0 8px 32px rgba(0, 0, 0, 0.72)",
+            color: palette.text,
+            colorScheme: isLight ? "light" : "dark"
+        } as const
+    };
+}
+
 export function QuickPanel({
     command,
     defaultDestination,
@@ -111,27 +157,7 @@ export function QuickPanel({
     const [duration, setDuration] = useState("");
     const [reason, setReason] = useState("");
     const [review, setReview] = useState(false);
-    const customColors = [gradientColor1, gradientColor2].filter(Boolean) as string[];
-    const isLight = customColors.length
-        ? customColors.every(color => hexLuminance(color) > 0.45)
-        : document.documentElement.classList.contains("theme-light")
-            || document.body.classList.contains("theme-light");
-    const palette = isLight ? lightPalette : darkPalette;
-    const customBackground = gradientColor1
-        ? gradientColor2
-            ? `linear-gradient(135deg, ${gradientColor1}, ${gradientColor2})`
-            : gradientColor1
-        : palette.background;
-    const panelStyle = {
-        ...panelBaseStyle,
-        border: `1px solid ${palette.border}`,
-        background: customBackground,
-        boxShadow: isLight
-            ? "0 8px 32px rgba(0, 0, 0, 0.24)"
-            : "0 8px 32px rgba(0, 0, 0, 0.72)",
-        color: palette.text,
-        colorScheme: isLight ? "light" : "dark"
-    } as const;
+    const { palette, panelStyle } = getPanelTheme(gradientColor1, gradientColor2);
     const inputStyle = {
         width: "100%",
         boxSizing: "border-box",
@@ -317,5 +343,96 @@ export function QuickPanel({
                 </button>
             </div>
         </form>
+    );
+}
+
+function confirmationButtonColor(style: number | undefined, fallback: string): string {
+    if (style === 3) return "#248046";
+    if (style === 4) return "#da373c";
+    if (style === 1) return "#5865f2";
+    return fallback;
+}
+
+export function SapphireConfirmationPanel({
+    body,
+    choices,
+    gradientColor1,
+    gradientColor2,
+    onChoose,
+    onClose,
+    onOpenOriginal,
+    user
+}: SapphireConfirmationPanelProps) {
+    const [busyChoice, setBusyChoice] = useState<string | null>(null);
+    const { palette, panelStyle } = getPanelTheme(gradientColor1, gradientColor2);
+
+    return (
+        <section aria-label={`Sapphire confirmation for ${user.username}`} style={panelStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                <div>
+                    <div style={{ fontSize: "16px", fontWeight: 700 }}>Sapphire confirmation</div>
+                    <div style={{ marginTop: "2px", color: palette.muted, fontSize: "12px" }}>
+                        Iolite · {user.username}
+                    </div>
+                </div>
+                <button
+                    aria-label="Close"
+                    type="button"
+                    disabled={busyChoice != null}
+                    onClick={onClose}
+                    style={{ border: 0, background: "transparent", color: palette.muted, cursor: "pointer", fontSize: "22px" }}
+                >
+                    ×
+                </button>
+            </div>
+
+            <div style={{ marginTop: "12px", maxHeight: "180px", overflow: "auto", whiteSpace: "pre-wrap" }}>
+                {body || "Sapphire needs confirmation because a recent punishment already exists."}
+            </div>
+
+            <div style={rowStyle}>
+                {choices.map(choice => (
+                    <button
+                        key={choice.customId}
+                        type="button"
+                        disabled={busyChoice != null}
+                        onClick={() => {
+                            setBusyChoice(choice.customId);
+                            void onChoose(choice).then(succeeded => {
+                                if (!succeeded) setBusyChoice(null);
+                            });
+                        }}
+                        style={{
+                            ...buttonBaseStyle,
+                            background: confirmationButtonColor(choice.style, palette.button),
+                            color: choice.style === 2 ? palette.text : "#ffffff",
+                            cursor: busyChoice == null ? "pointer" : "not-allowed",
+                            opacity: busyChoice != null && busyChoice !== choice.customId ? 0.55 : 1
+                        }}
+                    >
+                        {busyChoice === choice.customId ? "Sending…" : choice.label}
+                    </button>
+                ))}
+            </div>
+
+            <button
+                type="button"
+                disabled={busyChoice != null}
+                onClick={onOpenOriginal}
+                style={{
+                    width: "100%",
+                    marginTop: "8px",
+                    border: 0,
+                    padding: "4px",
+                    background: "transparent",
+                    color: palette.muted,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    fontSize: "12px"
+                }}
+            >
+                Open original Sapphire message
+            </button>
+        </section>
     );
 }

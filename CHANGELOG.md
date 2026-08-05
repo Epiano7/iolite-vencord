@@ -2,6 +2,13 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.5.0 - 2026-08-05
+
+- Detects Sapphire's recent-punishment confirmation response and mirrors its real action buttons in Iolite's bottom-right panel.
+- Sends the original Discord component interaction instead of repeating the punishment command, with one-click lockout and an original-message fallback.
+- Added a setting to disable relayed Sapphire confirmations.
+- Fixed commands sent to an unopened private moderation channel waiting indefinitely for Discord to load that channel.
+
 ## 0.4.0 - 2026-08-05
 
 - Prevented quick-panel typing from leaking into Discord's channel message composer.

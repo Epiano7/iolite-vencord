@@ -10,16 +10,20 @@ import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import { sendMessage } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
-import type { Channel, Message, User } from "@vencord/discord-types";
+import type { Channel, Message, MessageComponent, User } from "@vencord/discord-types";
 import {
+    AuthenticationStore,
     ChannelStore,
     ContextMenuApi,
     createRoot,
     Menu,
+    NavigationRouter,
     Parser,
+    RestAPI,
     SelectedChannelStore,
     SelectedGuildStore,
     showToast,
+    SnowflakeUtils,
     Toasts,
     useEffect,
     UserStore
@@ -27,7 +31,15 @@ import {
 import type { ReactElement } from "react";
 import type { Root } from "react-dom/client";
 
-import { QuickCommand, QuickDestination, QuickPanel, QuickPanelPreset, QuickPanelResult } from "./QuickPanel";
+import {
+    QuickCommand,
+    QuickDestination,
+    QuickPanel,
+    QuickPanelPreset,
+    QuickPanelResult,
+    SapphireConfirmationChoice,
+    SapphireConfirmationPanel
+} from "./QuickPanel";
 
 type PunishmentCommand = "ban" | "kick" | "mute" | "warn";
 type Destination = "current" | "private";
@@ -86,6 +98,11 @@ const settings = definePluginSettings({
     showWarnResponses: {
         type: OptionType.BOOLEAN,
         description: "Show Sapphire's response on screen when View Warns uses another channel",
+        default: true
+    },
+    relaySapphireConfirmations: {
+        type: OptionType.BOOLEAN,
+        description: "Show Sapphire's recent-punishment confirmation buttons in Iolite's quick panel",
         default: true
     },
     sapphireBotId: {
@@ -304,7 +321,8 @@ async function submitCommand(channelId: string | undefined, command: string) {
     }
 
     try {
-        await sendMessage(channelId, { content: command });
+        const isBackgroundChannel = channelId !== SelectedChannelStore.getChannelId();
+        await sendMessage(channelId, { content: command }, !isBackgroundChannel);
         ContextMenuApi.closeContextMenu();
         showToast("Sapphire command sent.", Toasts.Type.SUCCESS);
         return true;
@@ -326,6 +344,14 @@ interface PendingWarnLookup {
     user: User;
 }
 
+interface PendingModerationCommand {
+    channelId: string;
+    command: PunishmentCommand;
+    expiresAt: number;
+    guildId: string;
+    user: User;
+}
+
 interface Preset {
     command: PunishmentCommand;
     destination: Destination;
@@ -336,6 +362,8 @@ interface Preset {
 }
 
 let activeProfileTarget: ActiveProfileTarget | null = null;
+let pendingModerationCommand: PendingModerationCommand | null = null;
+let moderationCommandTimeout: number | null = null;
 let pendingWarnLookup: PendingWarnLookup | null = null;
 let warnLookupTimeout: number | null = null;
 let quickPanelContainer: HTMLDivElement | null = null;
@@ -346,6 +374,39 @@ function closeQuickPanel() {
     quickPanelContainer?.remove();
     quickPanelRoot = null;
     quickPanelContainer = null;
+}
+
+function mountQuickPanel(element: ReactElement) {
+    closeQuickPanel();
+    quickPanelContainer = document.createElement("div");
+    quickPanelContainer.id = "vc-iolite-quick-panel";
+    const containPanelEvent = (event: Event) => event.stopPropagation();
+    for (const eventName of ["beforeinput", "input", "keydown", "keypress", "keyup"])
+        quickPanelContainer.addEventListener(eventName, containPanelEvent);
+    document.body.append(quickPanelContainer);
+    const shadowRoot = quickPanelContainer.attachShadow({ mode: "closed" });
+    const mountPoint = document.createElement("div");
+    shadowRoot.append(mountPoint);
+    quickPanelRoot = createRoot(mountPoint);
+    quickPanelRoot.render(element);
+}
+
+function clearPendingModerationCommand() {
+    pendingModerationCommand = null;
+    if (moderationCommandTimeout != null) window.clearTimeout(moderationCommandTimeout);
+    moderationCommandTimeout = null;
+}
+
+function beginPendingModerationCommand(command: PunishmentCommand, channelId: string, guildId: string, user: User) {
+    clearPendingModerationCommand();
+    pendingModerationCommand = {
+        channelId,
+        command,
+        expiresAt: Date.now() + 45_000,
+        guildId,
+        user
+    };
+    moderationCommandTimeout = window.setTimeout(clearPendingModerationCommand, 45_000);
 }
 
 function clearPendingWarnLookup() {
@@ -367,19 +428,7 @@ function getDestinationId(guildId: string, destination: Destination, channel?: C
 }
 
 function openQuickPanel(command: QuickCommand, user: User, guildId: string, channel?: Channel) {
-    closeQuickPanel();
     ContextMenuApi.closeContextMenu();
-
-    quickPanelContainer = document.createElement("div");
-    quickPanelContainer.id = "vc-iolite-quick-panel";
-    const containPanelEvent = (event: Event) => event.stopPropagation();
-    for (const eventName of ["beforeinput", "input", "keydown", "keypress", "keyup"])
-        quickPanelContainer.addEventListener(eventName, containPanelEvent);
-    document.body.append(quickPanelContainer);
-    const shadowRoot = quickPanelContainer.attachShadow({ mode: "closed" });
-    const mountPoint = document.createElement("div");
-    shadowRoot.append(mountPoint);
-    quickPanelRoot = createRoot(mountPoint);
 
     const defaultDestination = getDefaultDestination(guildId) as QuickDestination;
     const presets = ([1, 2, 3] as const)
@@ -391,7 +440,7 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
             duration: preset.duration,
             reason: preset.reason
         }));
-    quickPanelRoot.render(
+    mountQuickPanel(
         <QuickPanel
             command={command}
             defaultDestination={defaultDestination}
@@ -411,11 +460,13 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
 
                 closeQuickPanel();
                 void (async () => {
+                    beginPendingModerationCommand(command, destinationId, guildId, user);
                     const sent = await submitCommand(
                         destinationId,
                         buildCommand(guildId, command, user.id, result.duration, result.reason, result.review)
                     );
                     if (sent) rememberRecentReason(command, result.reason);
+                    else clearPendingModerationCommand();
                 })();
             }}
         />
@@ -682,21 +733,108 @@ function SapphireEmbedCard({ embed }: { embed: any; }) {
     );
 }
 
+function isSapphireMessage(message: Message): boolean {
+    if (!message.author?.bot) return false;
+    const configuredBotId = settings.store.sapphireBotId.trim();
+    return configuredBotId
+        ? message.author.id === configuredBotId
+        : String(message.author.username ?? "").toLowerCase().includes("sapphire");
+}
+
+function flattenMessageComponents(components: MessageComponent[] = []): MessageComponent[] {
+    return components.flatMap(component => [
+        component,
+        ...flattenMessageComponents(component.components ?? [])
+    ]);
+}
+
+function getConfirmationChoices(message: Message): SapphireConfirmationChoice[] {
+    const buttons = flattenMessageComponents(message.components)
+        .filter(component => component.type === 2 && component.custom_id && !component.disabled && component.style !== 5);
+    if (!buttons.length) return [];
+
+    const responseText = extractSapphireResponse(message);
+    const confirmationWords = /approv|confirm|continue|proceed|punish anyway|yes|cancel|deny|decline|\bno\b|recent (?:case|punishment)/i;
+    if (!confirmationWords.test(responseText) && !buttons.some(button => confirmationWords.test(button.label ?? ""))) return [];
+
+    return buttons.slice(0, 4).map((button, index) => ({
+        customId: button.custom_id!,
+        label: button.label?.trim() || `Option ${index + 1}`,
+        style: button.style,
+        type: button.type
+    }));
+}
+
+function showSapphireConfirmation(message: Message, pending: PendingModerationCommand, choices: SapphireConfirmationChoice[]) {
+    clearPendingModerationCommand();
+    const body = extractSapphireResponse(message)
+        || `Sapphire found a recent punishment for ${pending.user.username} and needs confirmation.`;
+
+    mountQuickPanel(
+        <SapphireConfirmationPanel
+            body={body}
+            choices={choices}
+            gradientColor1={normalizeHexColor(settings.store.quickPanelColor1)}
+            gradientColor2={normalizeHexColor(settings.store.quickPanelColor2)}
+            onClose={closeQuickPanel}
+            user={pending.user}
+            onOpenOriginal={() => {
+                NavigationRouter.transitionTo(`/channels/${pending.guildId}/${message.channel_id}/${message.id}`);
+                closeQuickPanel();
+            }}
+            onChoose={async choice => {
+                try {
+                    await RestAPI.post({
+                        url: "/interactions",
+                        body: {
+                            type: 3,
+                            nonce: SnowflakeUtils.fromTimestamp(Date.now()),
+                            guild_id: pending.guildId,
+                            channel_id: message.channel_id,
+                            message_flags: Number(message.flags ?? 0),
+                            message_id: message.id,
+                            application_id: message.applicationId ?? message.author.id,
+                            session_id: AuthenticationStore.getSessionId(),
+                            data: {
+                                component_type: choice.type,
+                                custom_id: choice.customId
+                            }
+                        }
+                    });
+                    closeQuickPanel();
+                    showToast(`Sapphire: ${choice.label} sent.`, Toasts.Type.SUCCESS);
+                    return true;
+                } catch (error) {
+                    console.error("[Iolite] Failed to submit Sapphire confirmation", error);
+                    showToast("Sapphire confirmation failed. Open the original message and try there.", Toasts.Type.FAILURE);
+                    return false;
+                }
+            }}
+        />
+    );
+}
+
 function handleMessageCreate({ message, optimistic }: { message: Message; optimistic: boolean; }) {
+    const moderation = pendingModerationCommand;
+    if (moderation && !optimistic) {
+        if (Date.now() > moderation.expiresAt) {
+            clearPendingModerationCommand();
+        } else if (message.channel_id === moderation.channelId && isSapphireMessage(message)) {
+            const choices = settings.store.relaySapphireConfirmations
+                ? getConfirmationChoices(message)
+                : [];
+            if (choices.length) showSapphireConfirmation(message, moderation, choices);
+            else clearPendingModerationCommand();
+        }
+    }
+
     const lookup = pendingWarnLookup;
     if (!lookup || optimistic) return;
     if (Date.now() > lookup.expiresAt) {
         clearPendingWarnLookup();
         return;
     }
-    if (message.channel_id !== lookup.channelId || !message.author?.bot) return;
-
-    const configuredBotId = settings.store.sapphireBotId.trim();
-    const authorName = String(message.author.username ?? "").toLowerCase();
-    const isSapphire = configuredBotId
-        ? message.author.id === configuredBotId
-        : authorName.includes("sapphire");
-    if (!isSapphire) return;
+    if (message.channel_id !== lookup.channelId || !isSapphireMessage(message)) return;
 
     clearPendingWarnLookup();
     const sapphireEmbed = message.embeds?.[0];
@@ -771,6 +909,7 @@ function onPresetKeyDown(event: KeyboardEvent) {
         return;
     }
 
+    beginPendingModerationCommand(preset.command, destinationId, guildId, activeProfileTarget.user);
     void submitCommand(
         destinationId,
         buildCommand(
@@ -780,7 +919,9 @@ function onPresetKeyDown(event: KeyboardEvent) {
             preset.duration,
             preset.reason
         )
-    );
+    ).then(sent => {
+        if (!sent) clearPendingModerationCommand();
+    });
 }
 
 function ProfileTargetTracker({ guildId, user }: { guildId?: string; user: User; }) {
@@ -830,6 +971,7 @@ export default definePlugin({
     stop() {
         window.removeEventListener("keydown", onPresetKeyDown, true);
         activeProfileTarget = null;
+        clearPendingModerationCommand();
         clearPendingWarnLookup();
         closeQuickPanel();
     }

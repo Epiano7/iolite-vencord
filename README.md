@@ -15,6 +15,7 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 - Reuse the eight most recent successful ban and mute reasons from the matching moderation popup.
 - Send to the current channel or a configured private moderation channel.
 - Show Sapphire's original warnings embed as a persistent in-app card when the command runs elsewhere.
+- Relay Sapphire's recent-punishment confirmation buttons into the bottom-right panel without repeating the command.
 - Configure three named presets with an action, duration, reason, destination, and shortcut. Matching presets also appear as buttons in moderation popups.
 - Customize the popup with one solid hex color or a two-color diagonal gradient.
 - Store a different Sapphire prefix for each server.
@@ -83,6 +84,10 @@ Set **Quick Panel Color 1** to a six-digit hex color such as `#111214` for a sol
 ### Background warning lookups
 
 When **Iolite - View Warns** sends to a channel other than the one currently open, Iolite waits for Sapphire's reply and renders Sapphire's original embed in a persistent on-screen card, including its title, description, fields, color, images, and footer. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
+
+### Recent-punishment confirmations
+
+When Sapphire asks whether to continue because a recent punishment already exists, Iolite mirrors Sapphire's real buttons in the bottom-right panel. Selecting one submits the original message-component interaction and immediately locks the panel against double clicks; it never repeats the punishment command. Use **Open original Sapphire message** if the interaction expires or Discord rejects it. This behavior can be disabled with **Relay Sapphire Confirmations** in Iolite's settings.
 
 ## Compatibility monitoring
 
