@@ -36,8 +36,8 @@ When a new Iolite release is available, download and run its newer installer. Ma
 Run the installer from PowerShell or Command Prompt with one of these options:
 
 ```powershell
-.\IoliteSetup-v0.5.0-win-x64.exe --repair
-.\IoliteSetup-v0.5.0-win-x64.exe --uninstall
+.\IoliteSetup-v0.5.1-win-x64.exe --repair
+.\IoliteSetup-v0.5.1-win-x64.exe --uninstall
 ```
 
 For a managed installation, uninstalling removes the managed runtime. For an installer-managed source integration, it moves Iolite into a rollback backup and rebuilds the same checkout with every other user plugin still present. Vencord settings and backups are kept in both modes.

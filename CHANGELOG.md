@@ -2,6 +2,13 @@
 
 All notable changes to Iolite will be documented here.
 
+## 0.5.1 - 2026-08-05
+
+- Updated the Windows installer to follow the system light or dark app theme automatically.
+- Added modern Windows common-control styling, Segoe UI typography, improved spacing, and a larger progress-details area.
+- Release pages now show the current version's actual changelog entries instead of generic generated notes.
+- Corrected the installer's embedded executable version metadata.
+
 ## 0.5.0 - 2026-08-05
 
 - Detects Sapphire's recent-punishment confirmation response and mirrors its real action buttons in Iolite's bottom-right panel.

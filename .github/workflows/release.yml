@@ -210,4 +210,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME artifacts/* --repo $env:GITHUB_REPOSITORY --verify-tag --generate-notes --title "Iolite $env:GITHUB_REF_NAME"
+          $version = "${{ steps.versions.outputs.iolite_version }}"
+          $lines = @(Get-Content iolite/CHANGELOG.md)
+          $start = -1
+          for ($index = 0; $index -lt $lines.Count; $index++) {
+            if ($lines[$index].Trim() -like "## $version -*") {
+              $start = $index
+              break
+            }
+          }
+          if ($start -lt 0) { throw "CHANGELOG.md does not contain a section for $version" }
+
+          $end = $lines.Count
+          for ($index = $start + 1; $index -lt $lines.Count; $index++) {
+            if ($lines[$index] -like "## *") {
+              $end = $index
+              break
+            }
+          }
+          if ($end -le $start + 1) { throw "The $version changelog section is empty" }
+
+          $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
+          (($lines[($start + 1)..($end - 1)] -join "`n").Trim()) | Set-Content $notesPath
+          gh release create $env:GITHUB_REF_NAME artifacts/* --repo $env:GITHUB_REPOSITORY --verify-tag --notes-file $notesPath --title "Iolite $env:GITHUB_REF_NAME"

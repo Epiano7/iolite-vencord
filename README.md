@@ -59,6 +59,8 @@ The [full installation guide](INSTALL.md) covers:
 
 For most Windows users, the recommended route is the latest `IoliteSetup-...exe` from the public [Releases page](https://github.com/Epiano7/iolite-vencord/releases). It uses a managed runtime for standard Vencord, or detects an active source build and compiles Iolite beside its existing user plugins. Source integration requires Node.js and pnpm; the manual guide remains available when the automatic source path cannot be used.
 
+The installer follows the Windows app theme automatically, including a dark interface when Windows is set to dark mode.
+
 ## Configuration
 
 Right-click a member inside a server and open **Iolite - Server Settings**.

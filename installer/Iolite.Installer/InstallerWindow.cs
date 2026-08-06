@@ -5,6 +5,7 @@
  */
 
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace Iolite.Installer;
 
@@ -24,8 +25,12 @@ internal static class InstallerWindow
     private const uint WmCreate = 0x0001;
     private const uint WmDestroy = 0x0002;
     private const uint WmClose = 0x0010;
+    private const uint WmEraseBackground = 0x0014;
     private const uint WmSetFont = 0x0030;
     private const uint WmCommand = 0x0111;
+    private const uint WmControlColorEdit = 0x0133;
+    private const uint WmControlColorButton = 0x0135;
+    private const uint WmControlColorStatic = 0x0138;
     private const uint WmUser = 0x0400;
     private const uint PbmSetPos = WmUser + 2;
     private const uint PbmSetRange32 = WmUser + 6;
@@ -39,8 +44,11 @@ internal static class InstallerWindow
     private const uint MbOk = 0x00000000;
     private const uint MbIconInformation = 0x00000040;
     private const uint MbIconWarning = 0x00000030;
-    private const int ColorWindow = 5;
-    private const int DefaultGuiFont = 17;
+    private const int TransparentBackground = 1;
+    private const int FontWeightNormal = 400;
+    private const int FontWeightDemiBold = 600;
+    private const int DwmUseImmersiveDarkMode = 20;
+    private const int DwmUseImmersiveDarkModeBefore20H1 = 19;
     private const int IdcArrow = 32512;
     private const int IccProgressClass = 0x00000020;
 
@@ -54,11 +62,21 @@ internal static class InstallerWindow
     private static nint cancelButton;
     private static bool running;
     private static bool completed;
+    private static bool useDarkMode;
+    private static uint windowColor;
+    private static uint controlColor;
+    private static uint textColor;
+    private static nint windowBrush;
+    private static nint controlBrush;
+    private static nint bodyFont;
+    private static nint headingFont;
+    private static nint statusFont;
 
     internal static int Run(InstallerAction action)
     {
         currentAction = action;
         InitCommonControls();
+        InitializeTheme();
 
         nint instance = GetModuleHandleW(null);
         WndClassEx windowClass = new()
@@ -67,14 +85,14 @@ internal static class InstallerWindow
             WindowProcedure = WindowProcedureInstance,
             Instance = instance,
             Cursor = LoadCursorW(0, (nint)IdcArrow),
-            Background = (nint)(ColorWindow + 1),
+            Background = windowBrush,
             ClassName = WindowClass
         };
         if (RegisterClassExW(ref windowClass) == 0 && Marshal.GetLastWin32Error() != 1410)
             throw new InvalidOperationException("The installer window could not be registered.");
 
-        const int width = 600;
-        const int height = 430;
+        const int width = 720;
+        const int height = 520;
         int x = Math.Max(0, (GetSystemMetrics(0) - width) / 2);
         int y = Math.Max(0, (GetSystemMetrics(1) - height) / 2);
         window = CreateWindowExW(
@@ -120,6 +138,22 @@ internal static class InstallerWindow
             case WmCreate:
                 CreateControls(handle);
                 return 0;
+            case WmEraseBackground:
+                GetClientRect(handle, out Rectangle clientArea);
+                FillRect(unchecked((nint)wParam), ref clientArea, windowBrush);
+                return 1;
+            case WmControlColorStatic:
+                SetTextColor(unchecked((nint)wParam), textColor);
+                SetBkMode(unchecked((nint)wParam), TransparentBackground);
+                return windowBrush;
+            case WmControlColorEdit:
+                SetTextColor(unchecked((nint)wParam), textColor);
+                SetBkColor(unchecked((nint)wParam), controlColor);
+                return controlBrush;
+            case WmControlColorButton:
+                SetTextColor(unchecked((nint)wParam), textColor);
+                SetBkColor(unchecked((nint)wParam), controlColor);
+                return controlBrush;
             case WmCommand:
                 int id = unchecked((int)(wParam & 0xFFFF));
                 if (id == IdPrimary)
@@ -143,6 +177,10 @@ internal static class InstallerWindow
                 DestroyWindow(handle);
                 return 0;
             case WmDestroy:
+                DeleteObject(bodyFont);
+                DeleteObject(headingFont);
+                DeleteObject(statusFont);
+                DeleteObject(controlBrush);
                 PostQuitMessage(0);
                 return 0;
         }
@@ -153,7 +191,9 @@ internal static class InstallerWindow
     private static void CreateControls(nint parent)
     {
         nint instance = GetModuleHandleW(null);
-        nint font = GetStockObject(DefaultGuiFont);
+        bodyFont = CreateSegoeFont(-16, FontWeightNormal);
+        headingFont = CreateSegoeFont(-25, FontWeightDemiBold);
+        statusFont = CreateSegoeFont(-18, FontWeightDemiBold);
         string version = InstallerResources.ReadText("version.txt").Trim();
         string intro = currentAction switch
         {
@@ -163,36 +203,36 @@ internal static class InstallerWindow
             _ => "Remove Iolite from its managed runtime or installer-managed source build. Other user plugins, settings, and backups remain intact."
         };
 
-        CreateText(parent, instance, "Iolite", 24, 18, 535, 28, font);
-        CreateText(parent, instance, intro, 24, 53, 535, 48, font);
-        statusLabel = CreateText(parent, instance, "Ready", 24, 116, 535, 24, font);
-        progressBar = CreateWindowExW(0, "msctls_progress32", "", WsChild | WsVisible, 24, 146, 535, 24, parent, 0, instance, 0);
+        CreateText(parent, instance, "Iolite Installer", 28, 22, 640, 36, headingFont);
+        CreateText(parent, instance, intro, 28, 70, 640, 56, bodyFont);
+        statusLabel = CreateText(parent, instance, "Ready", 28, 143, 640, 26, statusFont);
+        progressBar = CreateWindowExW(0, "msctls_progress32", "", WsChild | WsVisible, 28, 178, 640, 20, parent, 0, instance, 0);
         SendMessageW(progressBar, PbmSetRange32, 0, 100);
         detailsBox = CreateWindowExW(
             0,
             "EDIT",
             "Select the action below to begin. The window will stay open and report each step.",
             WsChild | WsVisible | WsBorder | WsVScroll | EsMultiline | EsAutoVScroll | EsReadOnly,
-            24,
-            185,
-            535,
-            125,
+            28,
+            218,
+            640,
+            180,
             parent,
             0,
             instance,
             0
         );
-        ApplyFont(detailsBox, font);
+        ApplyFont(detailsBox, bodyFont);
 
         primaryButton = CreateWindowExW(
             0,
             "BUTTON",
             ActionButtonText(currentAction),
             WsChild | WsVisible | WsTabStop | BsDefaultPushButton,
-            343,
-            330,
-            104,
-            34,
+            436,
+            422,
+            112,
+            36,
             parent,
             (nint)IdPrimary,
             instance,
@@ -203,17 +243,18 @@ internal static class InstallerWindow
             "BUTTON",
             "Cancel",
             WsChild | WsVisible | WsTabStop,
-            455,
-            330,
-            104,
-            34,
+            556,
+            422,
+            112,
+            36,
             parent,
             (nint)IdCancel,
             instance,
             0
         );
-        ApplyFont(primaryButton, font);
-        ApplyFont(cancelButton, font);
+        ApplyFont(primaryButton, bodyFont);
+        ApplyFont(cancelButton, bodyFont);
+        ApplyWindowTheme(parent);
     }
 
     private static nint CreateText(nint parent, nint instance, string text, int x, int y, int width, int height, nint font)
@@ -224,6 +265,54 @@ internal static class InstallerWindow
     }
 
     private static void ApplyFont(nint control, nint font) => SendMessageW(control, WmSetFont, unchecked((nuint)font), 1);
+
+    private static nint CreateSegoeFont(int height, int weight) => CreateFontW(
+        height,
+        0,
+        0,
+        0,
+        weight,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        5,
+        0,
+        "Segoe UI"
+    );
+
+    private static void InitializeTheme()
+    {
+        useDarkMode = IsSystemDarkMode();
+        windowColor = useDarkMode ? ColorReference(31, 32, 35) : ColorReference(249, 249, 249);
+        controlColor = useDarkMode ? ColorReference(43, 45, 49) : ColorReference(255, 255, 255);
+        textColor = useDarkMode ? ColorReference(242, 243, 245) : ColorReference(32, 33, 36);
+        windowBrush = CreateSolidBrush(windowColor);
+        controlBrush = CreateSolidBrush(controlColor);
+    }
+
+    private static bool IsSystemDarkMode()
+    {
+        const string personalizeKey = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+        object? value = Registry.GetValue(personalizeKey, "AppsUseLightTheme", 1);
+        return value is int appsUseLightTheme && appsUseLightTheme == 0;
+    }
+
+    private static uint ColorReference(byte red, byte green, byte blue) =>
+        red | ((uint)green << 8) | ((uint)blue << 16);
+
+    private static void ApplyWindowTheme(nint parent)
+    {
+        int darkMode = useDarkMode ? 1 : 0;
+        if (DwmSetWindowAttribute(parent, DwmUseImmersiveDarkMode, ref darkMode, sizeof(int)) != 0)
+            DwmSetWindowAttribute(parent, DwmUseImmersiveDarkModeBefore20H1, ref darkMode, sizeof(int));
+
+        string theme = useDarkMode ? "DarkMode_Explorer" : "Explorer";
+        foreach (nint control in new[] { progressBar, detailsBox, primaryButton, cancelButton })
+            SetWindowTheme(control, theme, null);
+    }
 
     private static void StartOperation()
     {
@@ -348,6 +437,15 @@ internal static class InstallerWindow
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct Rectangle
+    {
+        internal int Left;
+        internal int Top;
+        internal int Right;
+        internal int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct InitCommonControlsExInfo
     {
         internal uint Size;
@@ -429,8 +527,52 @@ internal static class InstallerWindow
     [DllImport("user32.dll")]
     private static extern nint LoadCursorW(nint instance, nint cursorName);
 
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint CreateFontW(
+        int height,
+        int width,
+        int escapement,
+        int orientation,
+        int weight,
+        uint italic,
+        uint underline,
+        uint strikeOut,
+        uint characterSet,
+        uint outputPrecision,
+        uint clipPrecision,
+        uint quality,
+        uint pitchAndFamily,
+        string faceName
+    );
+
     [DllImport("gdi32.dll")]
-    private static extern nint GetStockObject(int objectIndex);
+    private static extern nint CreateSolidBrush(uint color);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(nint objectHandle);
+
+    [DllImport("gdi32.dll")]
+    private static extern uint SetTextColor(nint deviceContext, uint color);
+
+    [DllImport("gdi32.dll")]
+    private static extern uint SetBkColor(nint deviceContext, uint color);
+
+    [DllImport("gdi32.dll")]
+    private static extern int SetBkMode(nint deviceContext, int mode);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(nint window, out Rectangle rectangle);
+
+    [DllImport("user32.dll")]
+    private static extern int FillRect(nint deviceContext, ref Rectangle rectangle, nint brush);
+
+    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetWindowTheme(nint window, string? subApplicationName, string? subIdList);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(nint window, int attribute, ref int value, int valueSize);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
