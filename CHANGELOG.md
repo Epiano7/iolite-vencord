@@ -2,6 +2,15 @@
 
 All notable changes to Iolite will be documented here.
 
+## Unreleased
+
+- Added configurable User Info and Cases lookups alongside View Warns.
+- Added optional Iolite actions to message context menus.
+- Unified lookup response handling in Iolite's isolated panel and now renders every Sapphire embed in a response.
+- Added a configurable lookup-panel countdown that truly pauses on hover, keyboard focus, Discord blur, and window hiding.
+- Improved response matching with message timing and target-mention checks.
+- Credited Eoka for feature prototypes and design contributions.
+
 ## 0.5.1 - 2026-08-05
 
 - Updated the Windows installer to follow the system light or dark app theme automatically.

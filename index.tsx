@@ -5,7 +5,6 @@
  */
 
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
-import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import { sendMessage } from "@utils/discord";
@@ -38,11 +37,13 @@ import {
     QuickPanelPreset,
     QuickPanelResult,
     SapphireConfirmationChoice,
-    SapphireConfirmationPanel
+    SapphireConfirmationPanel,
+    SapphireLookupPanel
 } from "./QuickPanel";
 
 type PunishmentCommand = "ban" | "kick" | "mute" | "warn";
 type Destination = "current" | "private";
+type LookupType = "cases" | "userinfo" | "warns";
 
 const COMMAND_OPTIONS = [
     { label: "Warn", value: "warn", default: true },
@@ -57,8 +58,10 @@ const DESTINATION_OPTIONS = [
 ] as const;
 
 interface GuildConfig {
+    casesCommand?: string;
     prefix?: string;
     privateChannelId?: string;
+    userinfoCommand?: string;
 }
 
 interface RecentReasons {
@@ -70,6 +73,12 @@ interface UserContextProps {
     channel?: Channel;
     guildId?: string;
     user?: User;
+}
+
+interface MessageContextProps {
+    channel?: Channel;
+    guildId?: string;
+    message?: Message;
 }
 
 const settings = definePluginSettings({
@@ -97,7 +106,29 @@ const settings = definePluginSettings({
     },
     showWarnResponses: {
         type: OptionType.BOOLEAN,
-        description: "Show Sapphire's response on screen when View Warns uses another channel",
+        description: "Show Sapphire's Warns, User Info, and Cases responses in Iolite's on-screen panel",
+        default: true
+    },
+    lookupPanelTimeoutSeconds: {
+        type: OptionType.NUMBER,
+        description: "Seconds before lookup panels close; hover, keyboard focus, and leaving Discord pause the timer (0 keeps them open)",
+        default: 5
+    },
+    userinfoCommand: {
+        type: OptionType.STRING,
+        description: "Default Sapphire command name for User Info lookups",
+        placeholder: "userinfo",
+        default: "userinfo"
+    },
+    casesCommand: {
+        type: OptionType.STRING,
+        description: "Default Sapphire command name for Cases lookups",
+        placeholder: "cases",
+        default: "cases"
+    },
+    enableMessageActions: {
+        type: OptionType.BOOLEAN,
+        description: "Show Iolite actions when right-clicking a message",
         default: true
     },
     relaySapphireConfirmations: {
@@ -297,9 +328,23 @@ function getPrivateChannel(guildId: string): Channel | undefined {
     return channel?.guild_id === guildId ? channel : undefined;
 }
 
+const LOOKUP_LABELS: Record<LookupType, { action: string; title: string; }> = {
+    warns: { action: "View Warns", title: "Sapphire warns" },
+    userinfo: { action: "View User Info", title: "Sapphire user info" },
+    cases: { action: "View Cases", title: "Sapphire cases" }
+};
+
+function getLookupCommand(guildId: string, type: LookupType): string {
+    if (type === "warns") return "warns";
+    const config = getGuildConfig(guildId);
+    return type === "userinfo"
+        ? config.userinfoCommand?.trim() || settings.store.userinfoCommand.trim()
+        : config.casesCommand?.trim() || settings.store.casesCommand.trim();
+}
+
 function buildCommand(
     guildId: string,
-    command: PunishmentCommand | "warns",
+    command: string,
     userId: string,
     duration = "",
     reason = "",
@@ -309,7 +354,7 @@ function buildCommand(
 
     if (duration.trim()) parts.push(duration.trim());
     if (reason.trim()) parts.push(reason.trim());
-    if (review && command !== "warns") parts.push("-r");
+    if (review && ["ban", "kick", "mute", "warn"].includes(command)) parts.push("-r");
 
     return parts.join(" ");
 }
@@ -338,9 +383,11 @@ interface ActiveProfileTarget {
     user: User;
 }
 
-interface PendingWarnLookup {
+interface PendingLookup {
     channelId: string;
     expiresAt: number;
+    sentAt: number;
+    type: LookupType;
     user: User;
 }
 
@@ -364,8 +411,8 @@ interface Preset {
 let activeProfileTarget: ActiveProfileTarget | null = null;
 let pendingModerationCommand: PendingModerationCommand | null = null;
 let moderationCommandTimeout: number | null = null;
-let pendingWarnLookup: PendingWarnLookup | null = null;
-let warnLookupTimeout: number | null = null;
+let pendingLookup: PendingLookup | null = null;
+let lookupTimeout: number | null = null;
 let quickPanelContainer: HTMLDivElement | null = null;
 let quickPanelRoot: Root | null = null;
 
@@ -409,10 +456,10 @@ function beginPendingModerationCommand(command: PunishmentCommand, channelId: st
     moderationCommandTimeout = window.setTimeout(clearPendingModerationCommand, 45_000);
 }
 
-function clearPendingWarnLookup() {
-    pendingWarnLookup = null;
-    if (warnLookupTimeout != null) window.clearTimeout(warnLookupTimeout);
-    warnLookupTimeout = null;
+function clearPendingLookup() {
+    pendingLookup = null;
+    if (lookupTimeout != null) window.clearTimeout(lookupTimeout);
+    lookupTimeout = null;
 }
 
 function getDefaultDestination(guildId: string): Destination {
@@ -525,6 +572,8 @@ function makeGuildConfigurationItems(guildId: string) {
     const config = getGuildConfig(guildId);
     let prefix = config.prefix ?? settings.store.defaultPrefix;
     let privateChannelId = config.privateChannelId ?? "";
+    let userinfoCommand = config.userinfoCommand ?? "";
+    let casesCommand = config.casesCommand ?? "";
     const configuredChannel = getPrivateChannel(guildId);
 
     return [
@@ -548,6 +597,26 @@ function makeGuildConfigurationItems(guildId: string) {
                 updateGuildConfig(guildId, { privateChannelId });
             }
         }),
+        makeTextControl({
+            id: "vc-iolite-config-userinfo-command",
+            label: "User Info command for this server",
+            placeholder: `Default: ${settings.store.userinfoCommand.trim() || "userinfo"}`,
+            value: userinfoCommand,
+            onChange: value => {
+                userinfoCommand = value.replace(/\s/g, "");
+                updateGuildConfig(guildId, { userinfoCommand });
+            }
+        }),
+        makeTextControl({
+            id: "vc-iolite-config-cases-command",
+            label: "Cases command for this server",
+            placeholder: `Default: ${settings.store.casesCommand.trim() || "cases"}`,
+            value: casesCommand,
+            onChange: value => {
+                casesCommand = value.replace(/\s/g, "");
+                updateGuildConfig(guildId, { casesCommand });
+            }
+        }),
         <Menu.MenuItem
             key="vc-iolite-config-channel-status"
             id="vc-iolite-config-channel-status"
@@ -561,7 +630,7 @@ function makeGuildConfigurationItems(guildId: string) {
     ];
 }
 
-async function viewWarns(user: User, guildId: string, channel?: Channel) {
+async function viewLookup(type: LookupType, user: User, guildId: string, channel?: Channel) {
     const destination = getDefaultDestination(guildId);
     const destinationId = getDestinationId(guildId, destination, channel);
     if (!destinationId) {
@@ -569,18 +638,25 @@ async function viewWarns(user: User, guildId: string, channel?: Channel) {
         return;
     }
 
-    const isBackgroundLookup = destinationId !== SelectedChannelStore.getChannelId();
-    if (settings.store.showWarnResponses && isBackgroundLookup) {
-        clearPendingWarnLookup();
-        pendingWarnLookup = {
+    const command = getLookupCommand(guildId, type);
+    if (!command) {
+        showToast(`${LOOKUP_LABELS[type].action} is disabled because its command name is empty.`, Toasts.Type.FAILURE);
+        return;
+    }
+
+    clearPendingLookup();
+    if (settings.store.showWarnResponses) {
+        pendingLookup = {
             channelId: destinationId,
             expiresAt: Date.now() + 20_000,
+            sentAt: Date.now(),
+            type,
             user
         };
-        const lookup = pendingWarnLookup;
-        warnLookupTimeout = window.setTimeout(() => {
-            if (pendingWarnLookup !== lookup) return;
-            clearPendingWarnLookup();
+        const lookup = pendingLookup;
+        lookupTimeout = window.setTimeout(() => {
+            if (pendingLookup !== lookup) return;
+            clearPendingLookup();
             showToast(
                 "Iolite did not detect Sapphire's response. Configure Sapphire Bot ID if the bot has a different name.",
                 Toasts.Type.FAILURE
@@ -588,11 +664,11 @@ async function viewWarns(user: User, guildId: string, channel?: Channel) {
         }, 20_000);
     }
 
-    const sent = await submitCommand(destinationId, buildCommand(guildId, "warns", user.id));
-    if (!sent) clearPendingWarnLookup();
+    const sent = await submitCommand(destinationId, buildCommand(guildId, command, user.id));
+    if (!sent) clearPendingLookup();
 }
 
-function makeQuickItems(user: User, guildId: string, channel?: Channel): ReactElement[] {
+function makeQuickItems(user: User, guildId: string, channel?: Channel, includeSettings = true): ReactElement[] {
     const items = (["warn", "mute", "kick", "ban"] as const).map(command => (
         <Menu.MenuItem
             id={`vc-iolite-${command}`}
@@ -603,13 +679,16 @@ function makeQuickItems(user: User, guildId: string, channel?: Channel): ReactEl
         />
     ));
 
-    items.push(
+    items.push(...(["warns", "userinfo", "cases"] as const).map(type => (
         <Menu.MenuItem
-            id="vc-iolite-warns"
-            key="vc-iolite-warns"
-            label="Iolite - View Warns"
-            action={() => void viewWarns(user, guildId, channel)}
-        />,
+            id={`vc-iolite-${type}`}
+            key={`vc-iolite-${type}`}
+            label={`Iolite - ${LOOKUP_LABELS[type].action}`}
+            action={() => void viewLookup(type, user, guildId, channel)}
+        />
+    )));
+
+    if (includeSettings) items.push(
         <Menu.MenuItem
             id="vc-iolite-config"
             key="vc-iolite-config"
@@ -652,6 +731,17 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: User
         String(child?.props?.id ?? "").toLowerCase().includes("message")
     );
     fastActionGroup.splice(messageIndex + 1, 0, ...quickItems);
+};
+
+const MessageContextMenuPatch: NavContextMenuPatchCallback = (children, props: MessageContextProps) => {
+    if (!settings.store.enableMessageActions || !props.channel || !props.message?.author) return;
+    const guildId = props.guildId ?? props.channel.guild_id;
+    if (!guildId) return;
+    children.push(
+        <Menu.MenuGroup key="vc-iolite-message-actions">
+            {makeQuickItems(props.message.author, guildId, props.channel, false)}
+        </Menu.MenuGroup>
+    );
 };
 
 function extractSapphireResponse(message: Message): string {
@@ -741,6 +831,42 @@ function isSapphireMessage(message: Message): boolean {
         : String(message.author.username ?? "").toLowerCase().includes("sapphire");
 }
 
+function responseMatchesLookup(message: Message, lookup: PendingLookup): boolean {
+    if (SnowflakeUtils.extractTimestamp(message.id) < lookup.sentAt - 1_000) return false;
+
+    const mentionedIds = Array.from(extractSapphireResponse(message).matchAll(/<@!?(\d+)>/g), match => match[1]);
+    return mentionedIds.length === 0 || mentionedIds.includes(lookup.user.id);
+}
+
+function getLookupPanelTimeoutMs(): number {
+    const seconds = Number(settings.store.lookupPanelTimeoutSeconds);
+    if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+    return Math.min(seconds, 3_600) * 1_000;
+}
+
+function showLookupResponse(message: Message, lookup: PendingLookup) {
+    const embeds = message.embeds ?? [];
+    const responseText = extractSapphireResponse(message) || "Sapphire responded without text.";
+    mountQuickPanel(
+        <SapphireLookupPanel
+            gradientColor1={normalizeHexColor(settings.store.quickPanelColor1)}
+            gradientColor2={normalizeHexColor(settings.store.quickPanelColor2)}
+            onClose={closeQuickPanel}
+            timeoutMs={getLookupPanelTimeoutMs()}
+            title={LOOKUP_LABELS[lookup.type].title}
+            user={lookup.user}
+        >
+            {embeds.length > 0
+                ? <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {embeds.map((embed, index) => <SapphireEmbedCard key={index} embed={embed} />)}
+                </div>
+                : <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                    <EmbedText>{responseText}</EmbedText>
+                </div>}
+        </SapphireLookupPanel>
+    );
+}
+
 function flattenMessageComponents(components: MessageComponent[] = []): MessageComponent[] {
     return components.flatMap(component => [
         component,
@@ -828,27 +954,16 @@ function handleMessageCreate({ message, optimistic }: { message: Message; optimi
         }
     }
 
-    const lookup = pendingWarnLookup;
+    const lookup = pendingLookup;
     if (!lookup || optimistic) return;
     if (Date.now() > lookup.expiresAt) {
-        clearPendingWarnLookup();
+        clearPendingLookup();
         return;
     }
-    if (message.channel_id !== lookup.channelId || !isSapphireMessage(message)) return;
+    if (message.channel_id !== lookup.channelId || !isSapphireMessage(message) || !responseMatchesLookup(message, lookup)) return;
 
-    clearPendingWarnLookup();
-    const sapphireEmbed = message.embeds?.[0];
-    showNotification({
-        title: `Sapphire warns · ${lookup.user.username}`,
-        body: extractSapphireResponse(message) || "Sapphire responded without text.",
-        richBody: sapphireEmbed
-            ? <div style={{ maxHeight: "min(65vh, 640px)", overflow: "auto", width: "100%" }}>
-                <SapphireEmbedCard embed={sapphireEmbed} />
-            </div>
-            : undefined,
-        permanent: true,
-        color: "var(--brand-500)"
-    });
+    clearPendingLookup();
+    showLookupResponse(message, lookup);
 }
 
 function getPreset(index: 1 | 2 | 3): Preset {
@@ -946,10 +1061,15 @@ const author = {
     }
 };
 
+const eoka = {
+    name: "Eoka",
+    id: 1119704211291115561n
+};
+
 export default definePlugin({
     name: "Iolite",
     description: "A QoL vencord plugin for Sapphire commands",
-    authors: [author],
+    authors: [author, eoka],
     settings,
     patches: [{
         find: '"UserProfilePopout");',
@@ -962,7 +1082,8 @@ export default definePlugin({
         MESSAGE_CREATE: handleMessageCreate
     },
     contextMenus: {
-        "user-context": UserContextMenuPatch
+        "user-context": UserContextMenuPatch,
+        "message": MessageContextMenuPatch
     },
     profileTargetTracker,
     start() {
@@ -972,7 +1093,7 @@ export default definePlugin({
         window.removeEventListener("keydown", onPresetKeyDown, true);
         activeProfileTarget = null;
         clearPendingModerationCommand();
-        clearPendingWarnLookup();
+        clearPendingLookup();
         closeQuickPanel();
     }
 });

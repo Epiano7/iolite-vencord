@@ -5,7 +5,8 @@
  */
 
 import type { User } from "@vencord/discord-types";
-import { useState } from "@webpack/common";
+import { useEffect, useRef, useState } from "@webpack/common";
+import type { ReactNode } from "react";
 
 export type QuickCommand = "ban" | "kick" | "mute" | "warn";
 export type QuickDestination = "current" | "private";
@@ -52,6 +53,16 @@ interface QuickPanelProps {
     onSubmit(result: QuickPanelResult): void;
     presets: QuickPanelPreset[];
     recentReasons: string[];
+    user: User;
+}
+
+interface SapphireLookupPanelProps {
+    children: ReactNode;
+    gradientColor1?: string;
+    gradientColor2?: string;
+    onClose(): void;
+    timeoutMs: number;
+    title: string;
     user: User;
 }
 
@@ -433,6 +444,115 @@ export function SapphireConfirmationPanel({
             >
                 Open original Sapphire message
             </button>
+        </section>
+    );
+}
+
+export function SapphireLookupPanel({
+    children,
+    gradientColor1,
+    gradientColor2,
+    onClose,
+    timeoutMs,
+    title,
+    user
+}: SapphireLookupPanelProps) {
+    const normalizedTimeout = Number.isFinite(timeoutMs) ? Math.max(0, timeoutMs) : 0;
+    const remainingRef = useRef(normalizedTimeout);
+    const lastTickRef = useRef(performance.now());
+    const [remainingMs, setRemainingMs] = useState(normalizedTimeout);
+    const [isHovering, setIsHovering] = useState(false);
+    const [hasFocusWithin, setHasFocusWithin] = useState(false);
+    const [windowIsActive, setWindowIsActive] = useState(() => document.hasFocus() && !document.hidden);
+    const { palette, panelStyle } = getPanelTheme(gradientColor1, gradientColor2);
+    const isPaused = isHovering || hasFocusWithin || !windowIsActive;
+
+    useEffect(() => {
+        const updateWindowState = () => setWindowIsActive(document.hasFocus() && !document.hidden);
+        window.addEventListener("focus", updateWindowState);
+        window.addEventListener("blur", updateWindowState);
+        document.addEventListener("visibilitychange", updateWindowState);
+        return () => {
+            window.removeEventListener("focus", updateWindowState);
+            window.removeEventListener("blur", updateWindowState);
+            document.removeEventListener("visibilitychange", updateWindowState);
+        };
+    }, []);
+
+    useEffect(() => {
+        remainingRef.current = normalizedTimeout;
+        setRemainingMs(normalizedTimeout);
+        lastTickRef.current = performance.now();
+    }, [normalizedTimeout]);
+
+    useEffect(() => {
+        lastTickRef.current = performance.now();
+        if (normalizedTimeout === 0 || isPaused) return;
+
+        const interval = window.setInterval(() => {
+            const now = performance.now();
+            const elapsed = now - lastTickRef.current;
+            lastTickRef.current = now;
+            remainingRef.current = Math.max(0, remainingRef.current - elapsed);
+            setRemainingMs(remainingRef.current);
+            if (remainingRef.current === 0) {
+                window.clearInterval(interval);
+                onClose();
+            }
+        }, 250);
+        return () => window.clearInterval(interval);
+    }, [isPaused, normalizedTimeout, onClose]);
+
+    const progress = normalizedTimeout === 0 ? 1 : remainingMs / normalizedTimeout;
+
+    return (
+        <section
+            aria-label={`${title} for ${user.username}`}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+            onFocusCapture={() => setHasFocusWithin(true)}
+            onBlurCapture={event => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHasFocusWithin(false);
+            }}
+            style={{
+                ...panelStyle,
+                maxWidth: "calc(100vw - 36px)",
+                overflow: "hidden",
+                padding: 0,
+                width: "580px"
+            }}
+        >
+            <div style={{ padding: "16px 16px 12px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                    <div>
+                        <div style={{ fontSize: "16px", fontWeight: 700 }}>{title}</div>
+                        <div style={{ marginTop: "2px", color: palette.muted, fontSize: "12px" }}>
+                            Iolite · {user.username}
+                        </div>
+                    </div>
+                    <button
+                        aria-label="Close"
+                        type="button"
+                        onClick={onClose}
+                        style={{ border: 0, background: "transparent", color: palette.muted, cursor: "pointer", fontSize: "22px" }}
+                    >
+                        ×
+                    </button>
+                </div>
+                <div style={{ marginTop: "12px", maxHeight: "min(65vh, 640px)", overflow: "auto" }}>
+                    {children}
+                </div>
+                {normalizedTimeout > 0 && (
+                    <div style={{ marginTop: "10px", color: palette.muted, fontSize: "11px" }}>
+                        {isPaused ? "Dismiss timer paused" : `Closing in ${Math.max(1, Math.ceil(remainingMs / 1000))}s`}
+                    </div>
+                )}
+            </div>
+            {normalizedTimeout > 0 && (
+                <div style={{ height: "3px", background: palette.border }}>
+                    <div style={{ width: `${progress * 100}%`, height: "100%", background: "#5865f2" }} />
+                </div>
+            )}
         </section>
     );
 }

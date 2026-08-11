@@ -9,12 +9,13 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 
 ## Features
 
-- Use clearly labeled **Iolite - Warn**, **Iolite - Mute**, **Iolite - Kick**, **Iolite - Ban**, and **Iolite - View Warns** rows directly from a user's context menu—no Iolite dropdown.
+- Use clearly labeled moderation and lookup actions directly from a user's or message's context menu—no Iolite dropdown.
 - Optionally replace **Start a Call** and **Add Note** with the fast moderation rows.
 - Enter a reason and optional duration in a small floating editor while the rest of Discord stays usable.
 - Reuse the eight most recent successful ban and mute reasons from the matching moderation popup.
 - Send to the current channel or a configured private moderation channel.
-- Show Sapphire's original warnings embed as a persistent in-app card when the command runs elsewhere.
+- Show complete Sapphire Warns, User Info, and Cases responses in an isolated multi-embed panel.
+- Automatically close lookup panels after a configurable delay that pauses on hover, keyboard focus, or when Discord is not active.
 - Relay Sapphire's recent-punishment confirmation buttons into the bottom-right panel without repeating the command.
 - Configure three named presets with an action, duration, reason, destination, and shortcut. Matching presets also appear as buttons in moderation popups.
 - Customize the popup with one solid hex color or a two-color diagonal gradient.
@@ -42,6 +43,8 @@ mute [user] [duration] [reason] [-r]
 warn [user] [duration] [reason] [-r]
 warns [user]
 ```
+
+Iolite also provides configurable **User Info** and **Cases** lookups. Their default command names are `userinfo` and `cases`; change the global names in Iolite's settings or override either name from **Iolite - Server Settings** when a server uses a different Sapphire command or alias.
 
 Sapphire supports server-defined prefixes. Iolite defaults to `?`, and the prefix can be changed separately for each server from its context menu.
 
@@ -83,9 +86,13 @@ With **Remember Recent Reasons** enabled, Iolite stores the eight most recent su
 
 Set **Quick Panel Color 1** to a six-digit hex color such as `#111214` for a solid popup. Set **Quick Panel Color 2** as well to create a diagonal two-color gradient. Invalid or empty values safely fall back to Iolite's standard Discord-like dark or light panel.
 
-### Background warning lookups
+### Sapphire lookup panels
 
-When **Iolite - View Warns** sends to a channel other than the one currently open, Iolite waits for Sapphire's reply and renders Sapphire's original embed in a persistent on-screen card, including its title, description, fields, color, images, and footer. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
+**Iolite - View Warns**, **Iolite - View User Info**, and **Iolite - View Cases** use one response system. Iolite waits for Sapphire's reply and renders every returned embed in an isolated on-screen panel, including titles, descriptions, fields, colors, thumbnails, images, and footers. It checks the destination channel, Sapphire identity, response time, and available target mentions before accepting a response.
+
+The panel closes after five seconds by default. Hovering it, focusing anything inside it, switching away from Discord, or hiding the window pauses the countdown without resetting it. Set **Lookup Panel Timeout Seconds** to `0` to keep lookup panels open until manually closed. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
+
+Enable or disable message right-click actions with **Enable Message Actions**. Server-specific User Info and Cases command names are available under **Iolite - Server Settings**.
 
 ### Recent-punishment confirmations
 
@@ -104,6 +111,11 @@ pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPa
 pnpm testTsc
 pnpm build
 ```
+
+## Credits
+
+- **Epiano7** — creator and maintainer.
+- **Eoka** — feature prototypes and design contributions.
 
 ## License
 
