@@ -4,6 +4,8 @@ All notable changes to Iolite will be documented here.
 
 ## Unreleased
 
+- Fixed menu-editor drags appearing active but not moving an action when Discord swallowed the native drop event.
+
 ## 0.6.0 - 2026-08-13
 
 - Added configurable User Info and Cases lookups alongside View Warns.

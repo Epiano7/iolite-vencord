@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { useState } from "@webpack/common";
+import { useRef, useState } from "@webpack/common";
+import type { DragEvent as ReactDragEvent } from "react";
 
 export type MenuActionId = "ban" | "cases" | "kick" | "mute" | "recentMessages" | "userinfo" | "warn" | "warns";
 export type MenuContext = "message" | "profile";
@@ -69,6 +70,9 @@ interface ActionMenuEditorProps {
 export function ActionMenuEditor({ layouts, onChange }: ActionMenuEditorProps) {
     const [context, setContext] = useState<MenuContext>("profile");
     const [draggedId, setDraggedId] = useState<MenuActionId | null>(null);
+    const draggedIdRef = useRef<MenuActionId | null>(null);
+    const dropHandledRef = useRef(false);
+    const dropTargetRef = useRef<{ destination: keyof MenuLayout; index: number; } | null>(null);
     const [localLayouts, setLocalLayouts] = useState<MenuLayouts>(() => ({
         profile: normalizeMenuLayout(layouts.profile),
         message: normalizeMenuLayout(layouts.message)
@@ -80,15 +84,41 @@ export function ActionMenuEditor({ layouts, onChange }: ActionMenuEditorProps) {
         onChange(context, next);
     };
 
-    const move = (destination: keyof MenuLayout, index: number) => {
-        if (!draggedId) return;
+    const move = (id: MenuActionId, destination: keyof MenuLayout, index: number) => {
         const next = {
-            order: layout.order.filter(id => id !== draggedId),
-            hidden: layout.hidden.filter(id => id !== draggedId)
+            order: layout.order.filter(actionId => actionId !== id),
+            hidden: layout.hidden.filter(actionId => actionId !== id)
         };
-        next[destination].splice(index, 0, draggedId);
+        next[destination].splice(Math.min(index, next[destination].length), 0, id);
         setDraggedId(null);
         save(next);
+    };
+
+    const rememberDropTarget = (event: ReactDragEvent, destination: keyof MenuLayout, index: number) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        dropTargetRef.current = { destination, index };
+    };
+
+    const finishDrop = (event: ReactDragEvent, destination: keyof MenuLayout, index: number) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const transferredId = event.dataTransfer.getData("application/x-iolite-action") as MenuActionId;
+        const id = ALL_ACTION_IDS.includes(transferredId) ? transferredId : draggedIdRef.current;
+        if (!id) return;
+        dropHandledRef.current = true;
+        move(id, destination, index);
+    };
+
+    const finishDrag = () => {
+        if (!dropHandledRef.current && draggedIdRef.current && dropTargetRef.current) {
+            const { destination, index } = dropTargetRef.current;
+            move(draggedIdRef.current, destination, index);
+        }
+        draggedIdRef.current = null;
+        dropTargetRef.current = null;
+        dropHandledRef.current = false;
+        setDraggedId(null);
     };
 
     const reset = () => save({
@@ -109,8 +139,9 @@ export function ActionMenuEditor({ layouts, onChange }: ActionMenuEditorProps) {
 
     const renderZone = (key: keyof MenuLayout, title: string, hint: string) => (
         <div
-            onDragOver={event => event.preventDefault()}
-            onDrop={() => move(key, layout[key].length)}
+            data-iolite-menu-zone={key}
+            onDragOver={event => rememberDropTarget(event, key, layout[key].length)}
+            onDrop={event => finishDrop(event, key, layout[key].length)}
             style={{
                 flex: 1,
                 minWidth: 220,
@@ -127,14 +158,20 @@ export function ActionMenuEditor({ layouts, onChange }: ActionMenuEditorProps) {
                     <div
                         key={id}
                         draggable
-                        onDragStart={() => setDraggedId(id)}
-                        onDragEnd={() => setDraggedId(null)}
-                        onDragOver={event => event.preventDefault()}
-                        onDrop={event => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            move(key, index);
+                        data-iolite-menu-zone={key}
+                        data-iolite-menu-index={index}
+                        onDragStart={event => {
+                            draggedIdRef.current = id;
+                            dropTargetRef.current = null;
+                            dropHandledRef.current = false;
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("application/x-iolite-action", id);
+                            event.dataTransfer.setData("text/plain", id);
+                            setDraggedId(id);
                         }}
+                        onDragEnd={finishDrag}
+                        onDragOver={event => rememberDropTarget(event, key, index)}
+                        onDrop={event => finishDrop(event, key, index)}
                         style={{
                             display: "flex",
                             alignItems: "center",
