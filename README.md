@@ -7,6 +7,14 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 > [!IMPORTANT]
 > Iolite is a custom user plugin. It is not part of Vencord's approved built-in plugin collection. Manual installations require building Vencord from source, while the Windows release includes a pinned prebuilt Vencord runtime. Client modifications are against Discord's Terms of Service; use them at your own discretion.
 
+## Download & Installation
+
+### **[Download the latest Windows installer](https://github.com/Epiano7/iolite-vencord/releases/latest)**
+
+### **[Read the full installation guide](INSTALL.md)**
+
+The installer supports standard Vencord and existing source-built installations. If Vencord is not installed yet, or you use Vesktop or another custom setup, follow the full guide.
+
 ## Features
 
 - Use clearly labeled moderation and lookup actions directly from a user's or message's context menu—no Iolite dropdown.
@@ -28,11 +36,11 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 
 | Fast actions | Background warning lookup |
 | --- | --- |
-| <img src="docs/images/action-menu.png" alt="Iolite actions in Discord's user context menu" width="242"> | <img src="docs/images/warning-card-susbusamogus.png" alt="Iolite displaying Sapphire's warning response on screen" width="416"> |
+| <img src="docs/images/action-menu.png" alt="Iolite actions in Discord's user context menu" width="242"> | <img src="docs/images/warning-card-redacted.png" alt="Iolite displaying a redacted Sapphire warning response on screen" width="416"> |
 | Plugin settings | Keyboard preset settings |
 | <img src="docs/images/plugin-settings-redacted.png" alt="Iolite's Vencord plugin settings" width="620"> | <img src="docs/images/shortcut-settings.png" alt="Iolite's configurable profile shortcut settings" width="620"> |
 
-The screenshots redact private identifiers and avatars. `susbusamogus` is a consented demo account.
+The screenshots redact private identifiers and non-author avatars.
 
 ## Supported Sapphire commands
 
