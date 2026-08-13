@@ -18,6 +18,7 @@ The installer supports standard Vencord and existing source-built installations.
 ## Features
 
 - Use clearly labeled moderation and lookup actions directly from a user's or message's context menu—no Iolite dropdown.
+- Toggle a persistent Moderation Mode from the chat-bar hammer to focus member menus on Iolite actions during active incidents.
 - Reorder those actions separately for profile and message menus with a visual drag-and-drop editor, or move actions such as Ban into Hidden.
 - Optionally replace **Start a Call** and **Add Note** with the fast moderation rows.
 - Enter a reason and optional duration in a small floating editor while the rest of Discord stays usable.
@@ -111,6 +112,10 @@ Open Iolite's normal Vencord settings and use **Right-click Menu Layout**. Choos
 **Iolite - Recent Messages** opens in the bottom-right without changing channels. It searches the current server by default, can be narrowed to the current channel, supports loading more results, and offers a **Jump** button for messages still accessible to the moderator. Message text uses Discord-aware mentions and channel links, while link embeds and attachments are retained. Smart timestamps show the Discord-formatted time for messages under a day old and a readable age for older messages; Relative and Exact modes are also available.
 
 Recent Messages has its own 60-second dismissal setting because reviewing a history usually takes longer than checking a Sapphire response. Set **Recent Messages Panel Timeout Seconds** to `0` to keep it open until manually closed. Iolite uses Discord's own message-search response and does not build or retain a separate message-history database.
+
+### Moderation Mode
+
+The hammer in a server's chat bar toggles Moderation Mode and remains active until it is clicked again. By default, active mode removes Discord's Profile, Mention, Message, Call, and Note rows from member context menus so the reordered Iolite actions are faster to reach. It does not hide roles, IDs, Block, Apps, Mod View, or server-management entries. The hammer and native-row cleanup can be disabled independently in Iolite's settings.
 
 ### Recent-punishment confirmations
 

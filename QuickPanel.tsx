@@ -129,21 +129,22 @@ const lightPalette = {
 
 const panelBaseStyle = {
     position: "fixed",
-    right: "18px",
-    bottom: "18px",
+    right: "clamp(8px, 1.5vw, 18px)",
+    bottom: "clamp(8px, 1.5vw, 18px)",
     zIndex: 2147483647,
-    width: "340px",
+    width: "min(380px, calc(100vw - 16px))",
     boxSizing: "border-box",
-    padding: "16px",
+    padding: "clamp(12px, 1.5vw, 18px)",
     borderRadius: "12px",
     fontFamily: "gg sans, Noto Sans, Helvetica Neue, Helvetica, Arial, sans-serif",
-    fontSize: "14px",
-    lineHeight: 1.3,
+    fontSize: "clamp(14px, 0.55vw + 11px, 16px)",
+    lineHeight: 1.4,
     isolation: "isolate"
 } as const;
 
 const rowStyle = {
     display: "flex",
+    flexWrap: "wrap",
     gap: "8px",
     marginTop: "12px"
 } as const;
@@ -559,16 +560,18 @@ export function SapphireLookupPanel({
             }}
             style={{
                 ...panelStyle,
-                maxWidth: "calc(100vw - 36px)",
+                fontSize: "clamp(14px, 0.45vw + 12px, 16px)",
+                lineHeight: 1.45,
+                maxWidth: "calc(100vw - 16px)",
                 overflow: "hidden",
                 padding: 0,
-                width: "580px"
+                width: "min(640px, calc(100vw - 16px))"
             }}
         >
-            <div style={{ padding: "16px 16px 12px" }}>
+            <div style={{ padding: "clamp(12px, 1.8vw, 20px) clamp(12px, 1.8vw, 20px) 12px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
                     <div>
-                        <div style={{ fontSize: "16px", fontWeight: 700 }}>{title}</div>
+                        <div style={{ fontSize: "clamp(17px, 0.7vw + 13px, 20px)", fontWeight: 700 }}>{title}</div>
                         <div style={{ marginTop: "2px", color: palette.muted, fontSize: "12px" }}>
                             Iolite · {user.username}
                         </div>
@@ -582,7 +585,7 @@ export function SapphireLookupPanel({
                         ×
                     </button>
                 </div>
-                <div style={{ marginTop: "12px", maxHeight: "min(65vh, 640px)", overflow: "auto" }}>
+                <div style={{ marginTop: "12px", maxHeight: "min(72vh, 700px)", overflow: "auto", paddingRight: 2 }}>
                     {children}
                 </div>
                 {normalizedTimeout > 0 && (

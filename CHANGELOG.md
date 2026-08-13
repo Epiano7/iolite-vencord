@@ -9,6 +9,9 @@ All notable changes to Iolite will be documented here.
 - Added Smart, Relative, and Exact recent-message timestamps, including Discord's 12/24-hour preference.
 - Recent Messages now renders Discord mentions, channel links, link embeds, and image/file attachments.
 - Improved Sapphire lookup formatting by resolving mentions and channels against the response's server context.
+- Added a persistent chat-bar hammer for Moderation Mode, with an option to hide Discord's Profile, Mention, Message, Call, and Note rows while active.
+- Replaced shadow-DOM-incompatible Discord parser styling with Iolite-owned mention, channel, emoji, and link rendering.
+- Made quick panels wider and more responsive, with adaptive type sizes, tighter short embeds, and improved narrow-window field layout.
 
 ## 0.6.0 - 2026-08-13
 

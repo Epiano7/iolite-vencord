@@ -4,21 +4,23 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import { sendMessage } from "@utils/discord";
-import definePlugin, { OptionType } from "@utils/types";
+import definePlugin, { IconComponent, OptionType } from "@utils/types";
 import type { Channel, Message, MessageComponent, User } from "@vencord/discord-types";
 import {
     AuthenticationStore,
     ChannelStore,
     ContextMenuApi,
     createRoot,
+    GuildMemberStore,
+    GuildRoleStore,
     LocaleStore,
     Menu,
     NavigationRouter,
-    Parser,
     RestAPI,
     SelectedChannelStore,
     SelectedGuildStore,
@@ -27,8 +29,8 @@ import {
     Toasts,
     useEffect,
     UserSettingsProtoStore,
-    UserStore
-} from "@webpack/common";
+    UserStore,
+    useState } from "@webpack/common";
 import type { ReactElement } from "react";
 import type { Root } from "react-dom/client";
 
@@ -161,6 +163,21 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Show Iolite actions when right-clicking a message",
         default: true
+    },
+    showModerationModeButton: {
+        type: OptionType.BOOLEAN,
+        description: "Show the hammer button in server chat bars",
+        default: true
+    },
+    moderationModeHideNativeQuickActions: {
+        type: OptionType.BOOLEAN,
+        description: "While Moderation Mode is active, hide Discord's Profile, Mention, Message, Call, and Note rows",
+        default: true
+    },
+    moderationModeEnabled: {
+        type: OptionType.BOOLEAN,
+        description: "Keep Moderation Mode enabled until the hammer is clicked again",
+        default: false
     },
     actionMenuEditor: {
         type: OptionType.COMPONENT,
@@ -363,6 +380,44 @@ function updateGuildConfig(guildId: string, patch: Partial<GuildConfig>) {
 function getPrefix(guildId: string): string {
     return getGuildConfig(guildId).prefix?.trim() || settings.store.defaultPrefix.trim() || "?";
 }
+
+const ModerationHammerIcon: IconComponent = ({ className, height = 20, width = 20 }) => (
+    <svg aria-hidden className={className} height={height} viewBox="0 0 24 24" width={width}>
+        <path
+            d="m14.7 3.3 6 6-2.4 2.4-1.2-1.2-4.1 4.1.7.7-1.4 1.4-.7-.7-6.4 6.4-2.6-2.6L9 13.4l-.7-.7 1.4-1.4.7.7 4.1-4.1-1.2-1.2 1.4-2.4Z"
+            fill="currentColor"
+        />
+    </svg>
+);
+
+const ModerationModeButton: ChatBarButtonFactory = ({ channel, isMainChat }) => {
+    const [enabled, setEnabled] = useState(Boolean(settings.store.moderationModeEnabled));
+    if (!isMainChat || !channel.guild_id || !settings.store.showModerationModeButton) return null;
+
+    const toggle = () => {
+        const next = !enabled;
+        settings.store.moderationModeEnabled = next;
+        setEnabled(next);
+        showToast(`Moderation Mode ${next ? "enabled" : "disabled"}.`, Toasts.Type.SUCCESS);
+    };
+
+    return (
+        <ChatBarButton
+            buttonProps={{
+                "aria-pressed": enabled,
+                style: {
+                    background: enabled ? "var(--brand-500)" : undefined,
+                    borderRadius: 8,
+                    color: enabled ? "#fff" : undefined
+                }
+            }}
+            onClick={toggle}
+            tooltip={enabled ? "Disable Iolite Moderation Mode" : "Enable Iolite Moderation Mode"}
+        >
+            <ModerationHammerIcon />
+        </ChatBarButton>
+    );
+};
 
 function getCurrentChannelId(channel?: Channel): string | undefined {
     return channel?.id ?? SelectedChannelStore.getChannelId();
@@ -861,6 +916,13 @@ function isUnusedAction(child: ReactElement<any> | null | undefined): boolean {
         || id === "add-note";
 }
 
+function isNativeQuickAction(child: ReactElement<any> | null | undefined): boolean {
+    const id = String(child?.props?.id ?? "").toLowerCase();
+    const label = typeof child?.props?.label === "string" ? child.props.label.toLowerCase() : "";
+    return ["profile", "mention", "message", "start a call", "add note"].includes(label)
+        || ["profile", "mention", "message", "call", "user-note", "add-note"].includes(id);
+}
+
 const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: UserContextProps) => {
     if (!props.guildId || !props.user) return;
 
@@ -871,7 +933,11 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: User
         return;
     }
 
-    if (settings.store.replaceUnusedActions) {
+    if (settings.store.moderationModeEnabled && settings.store.moderationModeHideNativeQuickActions) {
+        for (let index = fastActionGroup.length - 1; index >= 0; index--) {
+            if (isNativeQuickAction(fastActionGroup[index])) fastActionGroup.splice(index, 1);
+        }
+    } else if (settings.store.replaceUnusedActions) {
         for (let index = fastActionGroup.length - 1; index >= 0; index--) {
             if (isUnusedAction(fastActionGroup[index])) fastActionGroup.splice(index, 1);
         }
@@ -913,16 +979,61 @@ function embedColor(color: unknown): string {
     return "var(--brand-500)";
 }
 
+const mentionStyle = {
+    background: "color-mix(in srgb, var(--brand-500) 25%, transparent)",
+    borderRadius: 3,
+    color: "var(--brand-360, #c9cdfb)",
+    display: "inline",
+    fontWeight: 500,
+    padding: "0 2px"
+} as const;
+
 function EmbedText({ channelId, children }: { channelId?: string; children: unknown; }) {
-    const text = typeof children === "string" ? children : String(children ?? "");
-    return text ? <>{Parser.parse(text, false, {
-        allowEmojiLinks: true,
-        allowHeading: true,
-        allowLinks: true,
-        allowList: true,
-        channelId,
-        viewingChannelId: channelId
-    })}</> : null;
+    const text = (typeof children === "string" ? children : String(children ?? "")).replace(/\n{3,}/g, "\n\n");
+    if (!text) return null;
+    const channel = channelId ? ChannelStore.getChannel(channelId) : undefined;
+    const guildId = channel?.guild_id;
+    const parts = text.split(/(\[[^\]]+\]\s*\(https?:\/\/[^)\s]+\)|https?:\/\/[^\s<]+|<@!?\d+>|<@&\d+>|<#\d+>|<a?:[A-Za-z0-9_]+:\d+>|\*\*[^*]+\*\*)/g);
+
+    return <>{parts.map((part, index) => {
+        if (!part) return null;
+        const markdownLink = part.match(/^\[([^\]]+)\]\s*\((https?:\/\/[^)\s]+)\)$/);
+        if (markdownLink) return <a href={markdownLink[2]} key={index} rel="noreferrer" style={{ color: "var(--text-link)" }} target="_blank">{markdownLink[1]}</a>;
+        if (/^https?:\/\//.test(part)) return <a href={part} key={index} rel="noreferrer" style={{ color: "var(--text-link)", overflowWrap: "anywhere" }} target="_blank">{part}</a>;
+        const userMention = part.match(/^<@!?(\d+)>$/);
+        if (userMention) {
+            const id = userMention[1];
+            const user = UserStore.getUser(id);
+            const name = guildId ? GuildMemberStore.getNick(guildId, id) : undefined;
+            return <span key={index} style={mentionStyle}>@{name ?? (user as any)?.globalName ?? user?.username ?? "unknown-user"}</span>;
+        }
+        const roleMention = part.match(/^<@&(\d+)>$/);
+        if (roleMention) {
+            const role = guildId ? GuildRoleStore.getRole(guildId, roleMention[1]) : undefined;
+            return <span key={index} style={mentionStyle}>@{role?.name ?? "unknown-role"}</span>;
+        }
+        const channelMention = part.match(/^<#(\d+)>$/);
+        if (channelMention) {
+            const mentionedChannel = ChannelStore.getChannel(channelMention[1]);
+            return <button
+                key={index}
+                onClick={() => mentionedChannel?.guild_id && NavigationRouter.transitionTo(`/channels/${mentionedChannel.guild_id}/${mentionedChannel.id}`)}
+                style={{ ...mentionStyle, border: 0, cursor: mentionedChannel ? "pointer" : "default", fontFamily: "inherit", fontSize: "inherit" }}
+                type="button"
+            >
+                #{mentionedChannel?.name ?? "unknown-channel"}
+            </button>;
+        }
+        const emoji = part.match(/^<(a?):([A-Za-z0-9_]+):(\d+)>$/);
+        if (emoji) return <img
+            alt={`:${emoji[2]}:`}
+            key={index}
+            src={`https://cdn.discordapp.com/emojis/${emoji[3]}.${emoji[1] ? "gif" : "webp"}?size=40&quality=lossless`}
+            style={{ height: "1.35em", margin: "0 1px", objectFit: "contain", verticalAlign: "-0.3em", width: "1.35em" }}
+        />;
+        if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+        return part;
+    })}</>;
 }
 
 function SapphireEmbedCard({ channelId, embed }: { channelId?: string; embed: any; }) {
@@ -948,30 +1059,30 @@ function SapphireEmbedCard({ channelId, embed }: { channelId?: string; embed: an
             width: "100%"
         }}>
             <div style={{ background: embedColor(embed.color) }} />
-            <div style={{ minWidth: 0, padding: "12px 16px 16px" }}>
+            <div style={{ minWidth: 0, padding: "clamp(10px, 1.4vw, 16px)" }}>
                 {embed.author?.name && <div style={{ alignItems: "center", display: "flex", fontSize: 12, fontWeight: 600, gap: 8, marginBottom: 8 }}>
                     {authorIcon && <img alt="" src={authorIcon} style={{ borderRadius: "50%", height: 24, width: 24 }} />}
                     <EmbedText channelId={channelId}>{embed.author.name}</EmbedText>
                 </div>}
                 <div style={{ display: "flex", gap: 16 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        {embed.title && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+                        {embed.title && <div style={{ fontSize: "clamp(16px, 0.55vw + 13px, 19px)", fontWeight: 650, marginBottom: 6 }}>
                             {embed.url
                                 ? <a href={embed.url} rel="noreferrer" style={{ color: "var(--text-link)", textDecoration: "none" }} target="_blank">
                                     <EmbedText channelId={channelId}>{embed.title}</EmbedText>
                                 </a>
                                 : <EmbedText channelId={channelId}>{embed.title}</EmbedText>}
                         </div>}
-                        {embed.description && <div style={{ fontSize: 14, lineHeight: "18px", whiteSpace: "pre-wrap" }}>
+                        {embed.description && <div style={{ fontSize: "inherit", lineHeight: 1.45, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
                             <EmbedText channelId={channelId}>{embed.description}</EmbedText>
                         </div>}
                     </div>
-                    {thumbnail && <img alt="" src={thumbnail} style={{ borderRadius: 4, height: 80, objectFit: "cover", width: 80 }} />}
+                    {thumbnail && <img alt="" src={thumbnail} style={{ borderRadius: 6, height: "clamp(56px, 12vw, 88px)", objectFit: "cover", width: "clamp(56px, 12vw, 88px)" }} />}
                 </div>
-                {!!embed.fields?.length && <div style={{ display: "grid", gap: "8px 16px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", marginTop: 12 }}>
+                {!!embed.fields?.length && <div style={{ display: "grid", gap: "10px 16px", gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))", marginTop: 10 }}>
                     {embed.fields.map((field: any, index: number) => <div key={index} style={{ gridColumn: field.inline ? "span 1" : "1 / -1", minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}><EmbedText channelId={channelId}>{field.name}</EmbedText></div>
-                        <div style={{ fontSize: 14, lineHeight: "18px", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                        <div style={{ fontSize: "inherit", fontWeight: 650, marginBottom: 3 }}><EmbedText channelId={channelId}>{field.name}</EmbedText></div>
+                        <div style={{ fontSize: "inherit", lineHeight: 1.42, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
                             <EmbedText channelId={channelId}>{field.value}</EmbedText>
                         </div>
                     </div>)}
@@ -1275,6 +1386,10 @@ export default definePlugin({
     description: "A QoL vencord plugin for Sapphire commands",
     authors: [author, eoka],
     settings,
+    chatBarButton: {
+        icon: ModerationHammerIcon,
+        render: ModerationModeButton
+    },
     patches: [{
         find: '"UserProfilePopout");',
         replacement: {
