@@ -5,6 +5,10 @@ All notable changes to Iolite will be documented here.
 ## Unreleased
 
 - Fixed menu-editor drags appearing active but not moving an action when Discord swallowed the native drop event.
+- Added a separate Recent Messages timeout setting with a 60-second default and a never-close option.
+- Added Smart, Relative, and Exact recent-message timestamps, including Discord's 12/24-hour preference.
+- Recent Messages now renders Discord mentions, channel links, link embeds, and image/file attachments.
+- Improved Sapphire lookup formatting by resolving mentions and channels against the response's server context.
 
 ## 0.6.0 - 2026-08-13
 

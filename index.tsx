@@ -15,6 +15,7 @@ import {
     ChannelStore,
     ContextMenuApi,
     createRoot,
+    LocaleStore,
     Menu,
     NavigationRouter,
     Parser,
@@ -25,6 +26,7 @@ import {
     SnowflakeUtils,
     Toasts,
     useEffect,
+    UserSettingsProtoStore,
     UserStore
 } from "@webpack/common";
 import type { ReactElement } from "react";
@@ -48,6 +50,7 @@ import {
     RecentMessagePage,
     RecentMessageScope,
     RecentMessagesPanel,
+    RecentMessageTimestampFormat,
     SapphireConfirmationChoice,
     SapphireConfirmationPanel,
     SapphireLookupPanel
@@ -67,6 +70,12 @@ const COMMAND_OPTIONS = [
 const DESTINATION_OPTIONS = [
     { label: "Current channel", value: "current", default: true },
     { label: "Private moderation channel", value: "private" }
+] as const;
+
+const RECENT_MESSAGE_TIMESTAMP_OPTIONS = [
+    { label: "Smart (time today, age when older)", value: "smart", default: true },
+    { label: "Relative age", value: "relative" },
+    { label: "Exact date and time", value: "absolute" }
 ] as const;
 
 interface GuildConfig {
@@ -125,6 +134,16 @@ const settings = definePluginSettings({
         type: OptionType.NUMBER,
         description: "Seconds before lookup panels close; hover, keyboard focus, and leaving Discord pause the timer (0 keeps them open)",
         default: 5
+    },
+    recentMessagesPanelTimeoutSeconds: {
+        type: OptionType.NUMBER,
+        description: "Seconds before Recent Messages closes; hover, keyboard focus, and leaving Discord pause the timer (0 keeps it open)",
+        default: 60
+    },
+    recentMessageTimestampFormat: {
+        type: OptionType.SELECT,
+        description: "Timestamp style used by Recent Messages",
+        options: RECENT_MESSAGE_TIMESTAMP_OPTIONS
     },
     userinfoCommand: {
         type: OptionType.STRING,
@@ -725,10 +744,17 @@ async function searchRecentMessages(
         .filter((message: any) => message?.id && message.author?.id === userId && !seen.has(message.id) && seen.add(message.id))
         .sort((left: any, right: any) => String(right.id).localeCompare(String(left.id)))
         .map((message: any): RecentMessageItem => ({
-            attachmentCount: Array.isArray(message.attachments) ? message.attachments.length : 0,
+            attachments: Array.isArray(message.attachments) ? message.attachments.map((attachment: any) => ({
+                contentType: attachment.content_type ?? attachment.contentType,
+                filename: String(attachment.filename ?? "attachment"),
+                height: attachment.height,
+                url: String(attachment.proxy_url ?? attachment.proxyURL ?? attachment.url ?? ""),
+                width: attachment.width
+            })).filter((attachment: any) => attachment.url) : [],
             channelId: message.channel_id,
             channelName: ChannelStore.getChannel(message.channel_id)?.name ?? "unknown-channel",
             content: String(message.content ?? ""),
+            embeds: Array.isArray(message.embeds) ? message.embeds : [],
             id: message.id,
             timestamp: message.timestamp ?? new Date(SnowflakeUtils.extractTimestamp(message.id)).toISOString()
         }));
@@ -748,19 +774,25 @@ function openRecentMessages(user: User, guildId: string, channel?: Channel) {
         return;
     }
     const currentChannel = ChannelStore.getChannel(channelId);
+    const { timestampHourCycle } = UserSettingsProtoStore.settings.appearance;
+    const hour12 = timestampHourCycle === 1 ? true : timestampHourCycle === 2 ? false : undefined;
     mountQuickPanel(
         <RecentMessagesPanel
             currentChannelName={currentChannel?.name ?? "current-channel"}
             defaultScope="server"
             gradientColor1={normalizeHexColor(settings.store.quickPanelColor1)}
             gradientColor2={normalizeHexColor(settings.store.quickPanelColor2)}
+            hour12={hour12}
             loadPage={(scope, offset) => searchRecentMessages(scope, guildId, channelId, user.id, offset)}
+            locale={LocaleStore.locale || navigator.language}
             onClose={closeQuickPanel}
             onJump={message => {
                 NavigationRouter.transitionTo(`/channels/${guildId}/${message.channelId}/${message.id}`);
                 closeQuickPanel();
             }}
-            timeoutMs={getLookupPanelTimeoutMs()}
+            renderMessage={message => <RecentMessageContent message={message} />}
+            timestampFormat={settings.store.recentMessageTimestampFormat as RecentMessageTimestampFormat}
+            timeoutMs={getPanelTimeoutMs(settings.store.recentMessagesPanelTimeoutSeconds)}
             user={user}
         />
     );
@@ -881,12 +913,19 @@ function embedColor(color: unknown): string {
     return "var(--brand-500)";
 }
 
-function EmbedText({ children }: { children: unknown; }) {
+function EmbedText({ channelId, children }: { channelId?: string; children: unknown; }) {
     const text = typeof children === "string" ? children : String(children ?? "");
-    return text ? <>{Parser.parse(text)}</> : null;
+    return text ? <>{Parser.parse(text, false, {
+        allowEmojiLinks: true,
+        allowHeading: true,
+        allowLinks: true,
+        allowList: true,
+        channelId,
+        viewingChannelId: channelId
+    })}</> : null;
 }
 
-function SapphireEmbedCard({ embed }: { embed: any; }) {
+function SapphireEmbedCard({ channelId, embed }: { channelId?: string; embed: any; }) {
     const authorIcon = embedMediaUrl({
         proxyURL: embed.author?.iconProxyURL ?? embed.author?.proxy_icon_url,
         url: embed.author?.iconURL ?? embed.author?.icon_url
@@ -912,23 +951,29 @@ function SapphireEmbedCard({ embed }: { embed: any; }) {
             <div style={{ minWidth: 0, padding: "12px 16px 16px" }}>
                 {embed.author?.name && <div style={{ alignItems: "center", display: "flex", fontSize: 12, fontWeight: 600, gap: 8, marginBottom: 8 }}>
                     {authorIcon && <img alt="" src={authorIcon} style={{ borderRadius: "50%", height: 24, width: 24 }} />}
-                    <EmbedText>{embed.author.name}</EmbedText>
+                    <EmbedText channelId={channelId}>{embed.author.name}</EmbedText>
                 </div>}
                 <div style={{ display: "flex", gap: 16 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                         {embed.title && <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-                            <EmbedText>{embed.title}</EmbedText>
+                            {embed.url
+                                ? <a href={embed.url} rel="noreferrer" style={{ color: "var(--text-link)", textDecoration: "none" }} target="_blank">
+                                    <EmbedText channelId={channelId}>{embed.title}</EmbedText>
+                                </a>
+                                : <EmbedText channelId={channelId}>{embed.title}</EmbedText>}
                         </div>}
                         {embed.description && <div style={{ fontSize: 14, lineHeight: "18px", whiteSpace: "pre-wrap" }}>
-                            <EmbedText>{embed.description}</EmbedText>
+                            <EmbedText channelId={channelId}>{embed.description}</EmbedText>
                         </div>}
                     </div>
                     {thumbnail && <img alt="" src={thumbnail} style={{ borderRadius: 4, height: 80, objectFit: "cover", width: 80 }} />}
                 </div>
                 {!!embed.fields?.length && <div style={{ display: "grid", gap: "8px 16px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", marginTop: 12 }}>
                     {embed.fields.map((field: any, index: number) => <div key={index} style={{ gridColumn: field.inline ? "span 1" : "1 / -1", minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}><EmbedText>{field.name}</EmbedText></div>
-                        <div style={{ fontSize: 14, lineHeight: "18px", whiteSpace: "pre-wrap" }}><EmbedText>{field.value}</EmbedText></div>
+                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}><EmbedText channelId={channelId}>{field.name}</EmbedText></div>
+                        <div style={{ fontSize: 14, lineHeight: "18px", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                            <EmbedText channelId={channelId}>{field.value}</EmbedText>
+                        </div>
                     </div>)}
                 </div>}
                 {image && <img alt="" src={image} style={{ borderRadius: 4, display: "block", marginTop: 16, maxHeight: 300, maxWidth: "100%", objectFit: "contain" }} />}
@@ -937,6 +982,43 @@ function SapphireEmbedCard({ embed }: { embed: any; }) {
                     <span>{[embed.footer?.text, embed.timestamp && new Date(embed.timestamp).toLocaleString()].filter(Boolean).join(" • ")}</span>
                 </div>}
             </div>
+        </div>
+    );
+}
+
+function RecentMessageContent({ message }: { message: RecentMessageItem; }) {
+    const hasContent = Boolean(message.content.trim());
+    const hasMedia = message.embeds.length > 0 || message.attachments.length > 0;
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {hasContent && <div style={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                <EmbedText channelId={message.channelId}>{message.content}</EmbedText>
+            </div>}
+            {message.embeds.map((embed, index) => (
+                <SapphireEmbedCard channelId={message.channelId} embed={embed} key={`embed-${index}`} />
+            ))}
+            {message.attachments.map((attachment, index) => {
+                const isImage = attachment.contentType?.startsWith("image/")
+                    || /\.(?:avif|gif|jpe?g|png|webp)(?:\?|$)/i.test(attachment.url);
+                return isImage
+                    ? <a href={attachment.url} key={`attachment-${index}`} rel="noreferrer" target="_blank">
+                        <img
+                            alt={attachment.filename}
+                            src={attachment.url}
+                            style={{ borderRadius: 6, display: "block", maxHeight: 260, maxWidth: "100%", objectFit: "contain" }}
+                        />
+                    </a>
+                    : <a
+                        href={attachment.url}
+                        key={`attachment-${index}`}
+                        rel="noreferrer"
+                        style={{ color: "var(--text-link)", overflowWrap: "anywhere" }}
+                        target="_blank"
+                    >
+                        {attachment.filename}
+                    </a>;
+            })}
+            {!hasContent && !hasMedia && <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No text content</span>}
         </div>
     );
 }
@@ -956,10 +1038,14 @@ function responseMatchesLookup(message: Message, lookup: PendingLookup): boolean
     return mentionedIds.length === 0 || mentionedIds.includes(lookup.user.id);
 }
 
-function getLookupPanelTimeoutMs(): number {
-    const seconds = Number(settings.store.lookupPanelTimeoutSeconds);
+function getPanelTimeoutMs(value: unknown): number {
+    const seconds = Number(value);
     if (!Number.isFinite(seconds) || seconds <= 0) return 0;
     return Math.min(seconds, 3_600) * 1_000;
+}
+
+function getLookupPanelTimeoutMs(): number {
+    return getPanelTimeoutMs(settings.store.lookupPanelTimeoutSeconds);
 }
 
 function showLookupResponse(message: Message, lookup: PendingLookup) {
@@ -976,10 +1062,10 @@ function showLookupResponse(message: Message, lookup: PendingLookup) {
         >
             {embeds.length > 0
                 ? <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {embeds.map((embed, index) => <SapphireEmbedCard key={index} embed={embed} />)}
+                    {embeds.map((embed, index) => <SapphireEmbedCard channelId={lookup.channelId} key={index} embed={embed} />)}
                 </div>
                 : <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                    <EmbedText>{responseText}</EmbedText>
+                    <EmbedText channelId={lookup.channelId}>{responseText}</EmbedText>
                 </div>}
         </SapphireLookupPanel>
     );

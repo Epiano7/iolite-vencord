@@ -108,7 +108,9 @@ Enable or disable message right-click actions with **Enable Message Actions**. S
 
 Open Iolite's normal Vencord settings and use **Right-click Menu Layout**. Choose the Profile or Message tab, then drag rows to set their top-to-bottom order. Drag an action into **Hidden** to remove it from that menu, or drag it back into **Visible actions** to restore it. The two layouts are independent, while **Iolite - Server Settings** remains pinned to the profile menu so configuration cannot become unreachable.
 
-**Iolite - Recent Messages** opens in the bottom-right without changing channels. It searches the current server by default, can be narrowed to the current channel, supports loading more results, and offers a **Jump** button for messages still accessible to the moderator. Iolite uses Discord's own message-search response and does not build or retain a separate message-history database.
+**Iolite - Recent Messages** opens in the bottom-right without changing channels. It searches the current server by default, can be narrowed to the current channel, supports loading more results, and offers a **Jump** button for messages still accessible to the moderator. Message text uses Discord-aware mentions and channel links, while link embeds and attachments are retained. Smart timestamps show the Discord-formatted time for messages under a day old and a readable age for older messages; Relative and Exact modes are also available.
+
+Recent Messages has its own 60-second dismissal setting because reviewing a history usually takes longer than checking a Sapphire response. Set **Recent Messages Panel Timeout Seconds** to `0` to keep it open until manually closed. Iolite uses Discord's own message-search response and does not build or retain a separate message-history database.
 
 ### Recent-punishment confirmations
 

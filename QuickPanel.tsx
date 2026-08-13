@@ -33,12 +33,22 @@ export interface SapphireConfirmationChoice {
 }
 
 export type RecentMessageScope = "channel" | "server";
+export type RecentMessageTimestampFormat = "absolute" | "relative" | "smart";
+
+export interface RecentMessageAttachment {
+    contentType?: string;
+    filename: string;
+    height?: number;
+    url: string;
+    width?: number;
+}
 
 export interface RecentMessageItem {
-    attachmentCount: number;
+    attachments: RecentMessageAttachment[];
     channelId: string;
     channelName: string;
     content: string;
+    embeds: any[];
     id: string;
     timestamp: string;
 }
@@ -88,9 +98,13 @@ interface RecentMessagesPanelProps {
     defaultScope: RecentMessageScope;
     gradientColor1?: string;
     gradientColor2?: string;
+    hour12?: boolean;
     loadPage(scope: RecentMessageScope, offset: number): Promise<RecentMessagePage>;
+    locale: string;
     onClose(): void;
     onJump(message: RecentMessageItem): void;
+    renderMessage(message: RecentMessageItem): ReactNode;
+    timestampFormat: RecentMessageTimestampFormat;
     timeoutMs: number;
     user: User;
 }
@@ -591,9 +605,13 @@ export function RecentMessagesPanel({
     defaultScope,
     gradientColor1,
     gradientColor2,
+    hour12,
     loadPage,
+    locale,
     onClose,
     onJump,
+    renderMessage,
+    timestampFormat,
     timeoutMs,
     user
 }: RecentMessagesPanelProps) {
@@ -632,6 +650,34 @@ export function RecentMessagesPanel({
 
     const switchScope = (nextScope: RecentMessageScope) => {
         if (nextScope !== scope) setScope(nextScope);
+    };
+
+    const formatRelativeAge = (date: Date) => {
+        const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1_000));
+        const units: Array<[number, string]> = [
+            [365 * 24 * 60 * 60, "year"],
+            [30 * 24 * 60 * 60, "month"],
+            [7 * 24 * 60 * 60, "week"],
+            [24 * 60 * 60, "day"],
+            [60 * 60, "hour"],
+            [60, "minute"]
+        ];
+        for (const [duration, label] of units) {
+            if (seconds >= duration) {
+                const count = Math.floor(seconds / duration);
+                return `${count} ${label}${count === 1 ? "" : "s"} old`;
+            }
+        }
+        return "just now";
+    };
+
+    const formatMessageTimestamp = (timestamp: string) => {
+        const date = new Date(timestamp);
+        if (timestampFormat === "absolute") return date.toLocaleString(locale, { hour12 });
+        if (timestampFormat === "relative" || Date.now() - date.getTime() >= 24 * 60 * 60 * 1_000) {
+            return formatRelativeAge(date);
+        }
+        return date.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit", hour12 });
     };
 
     return (
@@ -686,14 +732,16 @@ export function RecentMessagesPanel({
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: palette.muted, fontSize: 11 }}>
                             <span>#{message.channelName}</span>
-                            <span>{new Date(message.timestamp).toLocaleString()}</span>
+                            <span title={new Date(message.timestamp).toLocaleString(locale, { hour12 })}>
+                                {formatMessageTimestamp(message.timestamp)}
+                            </span>
                         </div>
                         <div style={{ marginTop: 6, whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.35 }}>
-                            {message.content || <span style={{ color: palette.muted, fontStyle: "italic" }}>No text content</span>}
+                            {renderMessage(message)}
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 7 }}>
                             <span style={{ color: palette.muted, fontSize: 11 }}>
-                                {message.attachmentCount > 0 ? `${message.attachmentCount} attachment${message.attachmentCount === 1 ? "" : "s"}` : ""}
+                                {message.attachments.length > 0 ? `${message.attachments.length} attachment${message.attachments.length === 1 ? "" : "s"}` : ""}
                             </span>
                             <button
                                 type="button"
