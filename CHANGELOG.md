@@ -4,14 +4,21 @@ All notable changes to Iolite will be documented here.
 
 ## Unreleased
 
-- Fixed menu-editor drags appearing active but not moving an action when Discord swallowed the native drop event.
-- Added a separate Recent Messages timeout setting with a 60-second default and a never-close option.
-- Added Smart, Relative, and Exact recent-message timestamps, including Discord's 12/24-hour preference.
+## 0.7.0 - 2026-08-13
+
+- Added a persistent chat-bar hammer for Moderation Mode. Its focused member menu keeps Iolite actions and Open in Mod View while hiding unrelated Discord and third-party rows.
+- Replaced the three fixed preset blocks with a visual preset manager supporting unlimited named presets, ordering, punishment type, reason, duration, destination, review flag, and keyboard shortcut.
+- Right-clicking an Iolite punishment row now opens its matching preset names for immediate execution while normal clicking still opens the full punishment panel.
+- Added persistent all-server and per-server Iolite moderation statistics for successful warns, mutes, kicks, and bans.
+- Added a share-card generator that exports the selected moderation statistics as a 1200×630 PNG.
+- Fixed menu-editor drags appearing active but not moving an action when Discord swallowed the native drop event, and added reliable move, show, and hide buttons.
+- Confirmed all Iolite configuration is stored in Vencord's persistent settings file, including menu layouts, presets, statistics, colors, and timeout preferences.
+- Standardized lookup panels on a 60-second default, migrated the former five-second default, and retained the never-close option.
+- Added Smart, Relative, and Exact Recent Messages timestamps, including Discord's 12/24-hour preference.
 - Recent Messages now renders Discord mentions, channel links, link embeds, and image/file attachments.
-- Improved Sapphire lookup formatting by resolving mentions and channels against the response's server context.
-- Added a persistent chat-bar hammer for Moderation Mode, with an option to hide Discord's Profile, Mention, Message, Call, and Note rows while active.
-- Replaced shadow-DOM-incompatible Discord parser styling with Iolite-owned mention, channel, emoji, and link rendering.
+- Sapphire lookups now render Discord timestamps, Markdown links, block quotes, mentions, channels, roles, custom emoji, and server context more faithfully.
 - Made quick panels wider and more responsive, with adaptive type sizes, tighter short embeds, and improved narrow-window field layout.
+- Updated the Windows installer, source-build integration, rollback handling, and CI checks to package the new preset and statistics components without affecting sibling user plugins.
 
 ## 0.6.0 - 2026-08-13
 

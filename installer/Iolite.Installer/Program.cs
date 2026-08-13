@@ -194,15 +194,21 @@ internal static class InstallerEngine
         string indexPath = Path.Combine(targetRoot, "index.tsx");
         string panelPath = Path.Combine(targetRoot, "QuickPanel.tsx");
         string menuEditorPath = Path.Combine(targetRoot, "MenuEditor.tsx");
+        string presetEditorPath = Path.Combine(targetRoot, "PresetEditor.tsx");
+        string statsPanelPath = Path.Combine(targetRoot, "StatsPanel.tsx");
         byte[] releaseIndex = InstallerResources.ReadBytes("source.index.tsx");
         byte[] releasePanel = InstallerResources.ReadBytes("source.QuickPanel.tsx");
         byte[] releaseMenuEditor = InstallerResources.ReadBytes("source.MenuEditor.tsx");
+        byte[] releasePresetEditor = InstallerResources.ReadBytes("source.PresetEditor.tsx");
+        byte[] releaseStatsPanel = InstallerResources.ReadBytes("source.StatsPanel.tsx");
 
         if (Directory.Exists(targetRoot) && !managedTarget)
         {
             bool sameRelease = FilesEqual(indexPath, releaseIndex)
                 && FilesEqual(panelPath, releasePanel)
-                && FilesEqual(menuEditorPath, releaseMenuEditor);
+                && FilesEqual(menuEditorPath, releaseMenuEditor)
+                && FilesEqual(presetEditorPath, releasePresetEditor)
+                && FilesEqual(statsPanelPath, releaseStatsPanel);
             if (!sameRelease)
             {
                 throw new InvalidOperationException(
@@ -222,6 +228,8 @@ internal static class InstallerEngine
             BackupFile(indexPath, Path.Combine(backupPluginRoot, "index.tsx"));
             BackupFile(panelPath, Path.Combine(backupPluginRoot, "QuickPanel.tsx"));
             BackupFile(menuEditorPath, Path.Combine(backupPluginRoot, "MenuEditor.tsx"));
+            BackupFile(presetEditorPath, Path.Combine(backupPluginRoot, "PresetEditor.tsx"));
+            BackupFile(statsPanelPath, Path.Combine(backupPluginRoot, "StatsPanel.tsx"));
             BackupFile(markerPath, Path.Combine(backupPluginRoot, ".iolite-installer-managed"));
         }
         else
@@ -246,7 +254,7 @@ internal static class InstallerEngine
             RunPnpm(pnpm, sourceRoot, "install", "--frozen-lockfile");
 
             report(52, "Validating all user plugins…", "Linting and type-checking the combined Vencord source tree.");
-            RunPnpm(pnpm, sourceRoot, "exec", "eslint", "src/userplugins/iolite/index.tsx", "src/userplugins/iolite/QuickPanel.tsx", "src/userplugins/iolite/MenuEditor.tsx");
+            RunPnpm(pnpm, sourceRoot, "exec", "eslint", "src/userplugins/iolite/index.tsx", "src/userplugins/iolite/QuickPanel.tsx", "src/userplugins/iolite/MenuEditor.tsx", "src/userplugins/iolite/PresetEditor.tsx", "src/userplugins/iolite/StatsPanel.tsx");
             RunPnpm(pnpm, sourceRoot, "testTsc");
 
             report(68, "Building Vencord with every user plugin…", "Iolite and the existing custom plugins are compiled into one runtime.");
@@ -416,7 +424,9 @@ internal static class InstallerEngine
         bool siblingsUnchanged = siblingsBefore.All(entry => File.Exists(entry.Key) && FileHash(entry.Key) == entry.Value);
         bool sourcePresent = File.Exists(Path.Combine(userPluginsRoot, "iolite", "index.tsx"))
             && File.Exists(Path.Combine(userPluginsRoot, "iolite", "QuickPanel.tsx"))
-            && File.Exists(Path.Combine(userPluginsRoot, "iolite", "MenuEditor.tsx"));
+            && File.Exists(Path.Combine(userPluginsRoot, "iolite", "MenuEditor.tsx"))
+            && File.Exists(Path.Combine(userPluginsRoot, "iolite", "PresetEditor.tsx"))
+            && File.Exists(Path.Combine(userPluginsRoot, "iolite", "StatsPanel.tsx"));
         return siblingsUnchanged && sourcePresent ? 0 : 1;
     }
 
@@ -478,6 +488,8 @@ internal static class InstallerEngine
         File.WriteAllBytes(Path.Combine(targetRoot, "index.tsx"), InstallerResources.ReadBytes("source.index.tsx"));
         File.WriteAllBytes(Path.Combine(targetRoot, "QuickPanel.tsx"), InstallerResources.ReadBytes("source.QuickPanel.tsx"));
         File.WriteAllBytes(Path.Combine(targetRoot, "MenuEditor.tsx"), InstallerResources.ReadBytes("source.MenuEditor.tsx"));
+        File.WriteAllBytes(Path.Combine(targetRoot, "PresetEditor.tsx"), InstallerResources.ReadBytes("source.PresetEditor.tsx"));
+        File.WriteAllBytes(Path.Combine(targetRoot, "StatsPanel.tsx"), InstallerResources.ReadBytes("source.StatsPanel.tsx"));
         File.WriteAllText(
             Path.Combine(targetRoot, ".iolite-installer-managed"),
             $"Managed by Iolite Installer {version}{Environment.NewLine}"
@@ -618,6 +630,8 @@ internal static class InstallerEngine
         RestoreFile(Path.Combine(backupPluginRoot, "index.tsx"), Path.Combine(targetRoot, "index.tsx"));
         RestoreFile(Path.Combine(backupPluginRoot, "QuickPanel.tsx"), Path.Combine(targetRoot, "QuickPanel.tsx"));
         RestoreFileOrDelete(Path.Combine(backupPluginRoot, "MenuEditor.tsx"), Path.Combine(targetRoot, "MenuEditor.tsx"));
+        RestoreFileOrDelete(Path.Combine(backupPluginRoot, "PresetEditor.tsx"), Path.Combine(targetRoot, "PresetEditor.tsx"));
+        RestoreFileOrDelete(Path.Combine(backupPluginRoot, "StatsPanel.tsx"), Path.Combine(targetRoot, "StatsPanel.tsx"));
         RestoreFile(Path.Combine(backupPluginRoot, ".iolite-installer-managed"), Path.Combine(targetRoot, ".iolite-installer-managed"));
     }
 

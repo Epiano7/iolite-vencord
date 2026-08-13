@@ -28,7 +28,9 @@ The installer supports standard Vencord and existing source-built installations.
 - Review a member's recent messages from the same bottom-right panel and jump directly to any result.
 - Automatically close lookup panels after a configurable delay that pauses on hover, keyboard focus, or when Discord is not active.
 - Relay Sapphire's recent-punishment confirmation buttons into the bottom-right panel without repeating the command.
-- Configure three named presets with an action, duration, reason, destination, and shortcut. Matching presets also appear as buttons in moderation popups.
+- Build an unlimited list of named punishment presets with actions, reasons, durations, destinations, review flags, ordering, and keyboard shortcuts.
+- Right-click an Iolite punishment row to run a matching preset immediately, or use the full moderation popup when details need review.
+- Track successful Iolite warns, mutes, kicks, and bans globally or per server and export a shareable statistics card.
 - Customize the popup with one solid hex color or a two-color diagonal gradient.
 - Store a different Sapphire prefix for each server.
 - Add Sapphire's `-r` punishment-review flag.
@@ -85,9 +87,9 @@ Right-click a member inside a server and open **Iolite - Server Settings**.
 
 Iolite verifies that the configured private destination belongs to the current server. A server-specific channel ID set from the context menu overrides the default channel ID.
 
-### Keyboard presets
+### Punishment presets and shortcuts
 
-Open Iolite's normal Vencord settings and configure the name, action, duration, reason, destination, and optional shortcut for **Preset 1**, **Preset 2**, or **Preset 3**. A shortcut can be a single key such as `1` or a combination such as `Ctrl+1`. Presets whose action matches the open moderation popup appear there as buttons; selecting one fills its duration, reason, and destination for review before sending.
+Open Iolite's normal Vencord settings and use the visual preset manager to add, remove, or reorder presets. Each preset can define a name, action, duration, reason, destination, Sapphire review flag, and optional shortcut. Right-click **Iolite - Warn**, **Mute**, **Kick**, or **Ban** in a member menu to see only matching preset names and send one immediately. Normal clicking still opens the complete moderation popup, where matching presets can fill the form for review.
 
 Left-click a member to open their profile, then press the configured shortcut. Iolite ignores preset shortcuts while you are typing in chat, a reason field, or another text input. A private preset fails safely instead of sending publicly when its private channel is unavailable.
 
@@ -101,7 +103,7 @@ Set **Quick Panel Color 1** to a six-digit hex color such as `#111214` for a sol
 
 **Iolite - View Warns**, **Iolite - View User Info**, and **Iolite - View Cases** use one response system. Iolite waits for Sapphire's reply and renders every returned embed in an isolated on-screen panel, including titles, descriptions, fields, colors, thumbnails, images, and footers. It checks the destination channel, Sapphire identity, response time, and available target mentions before accepting a response.
 
-The panel closes after five seconds by default. Hovering it, focusing anything inside it, switching away from Discord, or hiding the window pauses the countdown without resetting it. Set **Lookup Panel Timeout Seconds** to `0` to keep lookup panels open until manually closed. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
+The panel closes after 60 seconds by default. Hovering it, focusing anything inside it, switching away from Discord, or hiding the window pauses the countdown without resetting it. Set **Lookup Panel Timeout Seconds** to `0` to keep lookup panels open until manually closed. If a server uses a differently named Sapphire application, enter its bot user ID in **Sapphire Bot ID** for exact matching.
 
 Enable or disable message right-click actions with **Enable Message Actions**. Server-specific User Info and Cases command names are available under **Iolite - Server Settings**.
 
@@ -115,7 +117,11 @@ Recent Messages has its own 60-second dismissal setting because reviewing a hist
 
 ### Moderation Mode
 
-The hammer in a server's chat bar toggles Moderation Mode and remains active until it is clicked again. By default, active mode removes Discord's Profile, Mention, Message, Call, and Note rows from member context menus so the reordered Iolite actions are faster to reach. It does not hide roles, IDs, Block, Apps, Mod View, or server-management entries. The hammer and native-row cleanup can be disabled independently in Iolite's settings.
+The hammer in a server's chat bar toggles Moderation Mode and remains active until it is clicked again. By default, active mode reduces member context menus to Iolite's reordered actions plus Discord's **Open in Mod View** entry. This also removes unrelated rows added by other plugins. The hammer and focused-menu behavior can be disabled independently in Iolite's settings.
+
+### Moderation statistics
+
+The statistics section counts successful warn, mute, kick, and ban commands sent through Iolite on this device. Choose **All servers** or a server-specific view, then select **Generate share image** to download a 1200×630 PNG card. Iolite stores these counts with its other Vencord settings; it cannot reconstruct commands sent before statistics tracking was introduced or commands sent manually outside Iolite.
 
 ### Recent-punishment confirmations
 
@@ -130,7 +136,7 @@ The repository's scheduled GitHub Actions workflow checks Iolite against the lat
 Place this repository at `Vencord/src/userplugins/iolite`, then run from the Vencord root:
 
 ```powershell
-pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx src/userplugins/iolite/MenuEditor.tsx
+pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx src/userplugins/iolite/MenuEditor.tsx src/userplugins/iolite/PresetEditor.tsx src/userplugins/iolite/StatsPanel.tsx
 pnpm testTsc
 pnpm build
 ```
