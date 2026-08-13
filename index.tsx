@@ -173,7 +173,7 @@ const settings = definePluginSettings({
     },
     moderationModeHideNativeQuickActions: {
         type: OptionType.BOOLEAN,
-        description: "While Moderation Mode is active, hide Discord's Profile, Mention, Message, Call, and Note rows",
+        description: "While Moderation Mode is active, show only Iolite actions and Discord's Open in Mod View action",
         default: true
     },
     moderationModeEnabled: {
@@ -1010,24 +1010,25 @@ function isUnusedAction(child: ReactElement<any> | null | undefined): boolean {
         || id === "add-note";
 }
 
-function isNativeQuickAction(child: ReactElement<any> | null | undefined): boolean {
+function isFocusedModerationAction(child: ReactElement<any> | null | undefined): boolean {
     const id = String(child?.props?.id ?? "").toLowerCase();
-    const label = typeof child?.props?.label === "string" ? child.props.label.toLowerCase() : "";
-    return ["profile", "mention", "message", "start a call", "add note", "apps", "roles", "role", "edit per-server profile"].includes(label)
-        || ["profile", "mention", "message", "call", "user-note", "add-note", "apps", "roles", "role"].includes(id)
-        || label.startsWith("edit per-server profile");
+    const label = typeof child?.props?.label === "string" ? child.props.label.toLowerCase().trim() : "";
+    return id.startsWith("vc-iolite-")
+        || label.startsWith("iolite -")
+        || label === "open in mod view";
 }
 
 function pruneModerationModeItems(nodes: any[]): void {
     for (let index = nodes.length - 1; index >= 0; index--) {
         const node = nodes[index];
-        if (isNativeQuickAction(node)) {
-            nodes.splice(index, 1);
-            continue;
-        }
-
+        if (isFocusedModerationAction(node)) continue;
         const nested = node?.props?.children;
-        if (Array.isArray(nested)) pruneModerationModeItems(nested);
+        if (Array.isArray(nested)) {
+            pruneModerationModeItems(nested);
+            if (nested.length === 0) nodes.splice(index, 1);
+        } else {
+            nodes.splice(index, 1);
+        }
     }
 }
 
@@ -1043,9 +1044,8 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: User
         return;
     }
 
-    if (settings.store.moderationModeEnabled && settings.store.moderationModeHideNativeQuickActions) {
-        pruneModerationModeItems(children);
-    } else if (settings.store.replaceUnusedActions) {
+    const focusedMode = settings.store.moderationModeEnabled && settings.store.moderationModeHideNativeQuickActions;
+    if (!focusedMode && settings.store.replaceUnusedActions) {
         for (let index = fastActionGroup.length - 1; index >= 0; index--) {
             if (isUnusedAction(fastActionGroup[index])) fastActionGroup.splice(index, 1);
         }
@@ -1055,6 +1055,7 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: User
         String(child?.props?.id ?? "").toLowerCase().includes("message")
     );
     fastActionGroup.splice(messageIndex + 1, 0, ...quickItems);
+    if (focusedMode) pruneModerationModeItems(children);
 };
 
 const MessageContextMenuPatch: NavContextMenuPatchCallback = (children, props: MessageContextProps) => {
