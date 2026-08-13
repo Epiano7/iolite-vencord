@@ -42,6 +42,7 @@ import {
     type MenuLayouts,
     normalizeMenuLayout
 } from "./MenuEditor";
+import { IolitePreset, PresetEditor } from "./PresetEditor";
 import {
     QuickCommand,
     QuickDestination,
@@ -57,6 +58,7 @@ import {
     SapphireConfirmationPanel,
     SapphireLookupPanel
 } from "./QuickPanel";
+import { EMPTY_COUNTS, EMPTY_STATS, IoliteStats, StatCommand, StatsPanel } from "./StatsPanel";
 
 type PunishmentCommand = "ban" | "kick" | "mute" | "warn";
 type Destination = "current" | "private";
@@ -135,7 +137,7 @@ const settings = definePluginSettings({
     lookupPanelTimeoutSeconds: {
         type: OptionType.NUMBER,
         description: "Seconds before lookup panels close; hover, keyboard focus, and leaving Discord pause the timer (0 keeps them open)",
-        default: 5
+        default: 60
     },
     recentMessagesPanelTimeoutSeconds: {
         type: OptionType.NUMBER,
@@ -237,53 +239,73 @@ const settings = definePluginSettings({
         placeholder: "#5865F2",
         default: ""
     },
+    presetEditor: {
+        type: OptionType.COMPONENT,
+        component: () => <PresetEditor
+            presets={settings.store.presets ?? []}
+            onChange={presets => { settings.store.presets = presets; }}
+        />
+    },
+    statsPanel: {
+        type: OptionType.COMPONENT,
+        component: () => <StatsPanel stats={settings.store.stats ?? EMPTY_STATS} />
+    },
     preset1Name: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 1 name shown in moderation popups",
         placeholder: "Preset 1",
         default: "Preset 1"
     },
     preset1Shortcut: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 1 shortcut, such as 1 or Ctrl+1",
         placeholder: "Ctrl+1",
         default: ""
     },
     preset1Command: {
+        hidden: true,
         type: OptionType.SELECT,
         description: "Preset 1 action",
         options: COMMAND_OPTIONS
     },
     preset1Duration: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 1 duration, when supported",
         placeholder: "e.g. 1h",
         default: ""
     },
     preset1Reason: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 1 reason",
         placeholder: "Preset moderation reason",
         default: ""
     },
     preset1Destination: {
+        hidden: true,
         type: OptionType.SELECT,
         description: "Preset 1 destination",
         options: DESTINATION_OPTIONS
     },
     preset2Name: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 2 name shown in moderation popups",
         placeholder: "Preset 2",
         default: "Preset 2"
     },
     preset2Shortcut: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 2 shortcut, such as 2 or Ctrl+2",
         placeholder: "Ctrl+2",
         default: ""
     },
     preset2Command: {
+        hidden: true,
         type: OptionType.SELECT,
         description: "Preset 2 action",
         options: [
@@ -294,35 +316,41 @@ const settings = definePluginSettings({
         ]
     },
     preset2Duration: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 2 duration, when supported",
         placeholder: "e.g. 1h",
         default: ""
     },
     preset2Reason: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 2 reason",
         placeholder: "Preset moderation reason",
         default: ""
     },
     preset2Destination: {
+        hidden: true,
         type: OptionType.SELECT,
         description: "Preset 2 destination",
         options: DESTINATION_OPTIONS
     },
     preset3Name: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 3 name shown in moderation popups",
         placeholder: "Preset 3",
         default: "Preset 3"
     },
     preset3Shortcut: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 3 shortcut, such as 3 or Ctrl+3",
         placeholder: "Ctrl+3",
         default: ""
     },
     preset3Command: {
+        hidden: true,
         type: OptionType.SELECT,
         description: "Preset 3 action",
         options: [
@@ -333,18 +361,21 @@ const settings = definePluginSettings({
         ]
     },
     preset3Duration: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 3 duration, when supported",
         placeholder: "e.g. 1h",
         default: ""
     },
     preset3Reason: {
+        hidden: true,
         type: OptionType.STRING,
         description: "Preset 3 reason",
         placeholder: "Preset moderation reason",
         default: ""
     },
     preset3Destination: {
+        hidden: true,
         type: OptionType.SELECT,
         description: "Preset 3 destination",
         options: DESTINATION_OPTIONS
@@ -360,6 +391,18 @@ const settings = definePluginSettings({
     recentReasons: {
         type: OptionType.CUSTOM,
         default: { ban: [], mute: [] } as RecentReasons
+    },
+    presets: {
+        type: OptionType.CUSTOM,
+        default: [] as IolitePreset[]
+    },
+    stats: {
+        type: OptionType.CUSTOM,
+        default: EMPTY_STATS as IoliteStats
+    },
+    dataVersion: {
+        type: OptionType.CUSTOM,
+        default: 0
     }
 });
 
@@ -582,8 +625,7 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
     ContextMenuApi.closeContextMenu();
 
     const defaultDestination = getDefaultDestination(guildId) as QuickDestination;
-    const presets = ([1, 2, 3] as const)
-        .map(getPreset)
+    const presets = getAllPresets()
         .filter(preset => preset.command === command && Boolean(preset.reason.trim() || preset.duration.trim()))
         .map((preset): QuickPanelPreset => ({
             name: preset.name.trim() || "Unnamed preset",
@@ -616,12 +658,51 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
                         destinationId,
                         buildCommand(guildId, command, user.id, result.duration, result.reason, result.review)
                     );
-                    if (sent) rememberRecentReason(command, result.reason);
-                    else clearPendingModerationCommand();
+                    if (sent) {
+                        rememberRecentReason(command, result.reason);
+                        recordStat(command, guildId);
+                    } else clearPendingModerationCommand();
                 })();
             }}
         />
     );
+}
+
+function runPreset(preset: Preset, user: User, guildId: string, channel?: Channel) {
+    const destinationId = getDestinationId(guildId, preset.destination, channel);
+    if (!destinationId) {
+        showToast("That preset's destination channel is not configured.", Toasts.Type.FAILURE);
+        return;
+    }
+
+    beginPendingModerationCommand(preset.command, destinationId, guildId, user);
+    void submitCommand(
+        destinationId,
+        buildCommand(guildId, preset.command, user.id, preset.duration, preset.reason, Boolean((preset as IolitePreset).review))
+    ).then(sent => {
+        if (sent) {
+            rememberRecentReason(preset.command, preset.reason);
+            recordStat(preset.command, guildId);
+        } else clearPendingModerationCommand();
+    });
+}
+
+function openPresetContextMenu(event: any, command: PunishmentCommand, user: User, guildId: string, channel?: Channel) {
+    event.preventDefault();
+    event.stopPropagation();
+    const presets = getAllPresets().filter(preset => preset.command === command);
+    ContextMenuApi.openContextMenu(event, () => (
+        <Menu.Menu navId={`vc-iolite-${command}-presets`} onClose={ContextMenuApi.closeContextMenu} aria-label={`${command} presets`}>
+            {presets.length
+                ? presets.map(preset => <Menu.MenuItem
+                    id={`vc-iolite-preset-${preset.id ?? preset.name}`}
+                    key={preset.id ?? preset.name}
+                    label={preset.name.trim() || "Unnamed preset"}
+                    action={() => runPreset(preset, user, guildId, channel)}
+                />)
+                : <Menu.MenuItem id="vc-iolite-no-presets" label="No presets configured" disabled />}
+        </Menu.Menu>
+    ));
 }
 
 function normalizeHexColor(value: string): string | undefined {
@@ -643,6 +724,18 @@ function rememberRecentReason(command: QuickCommand, reason: string) {
     settings.store.recentReasons = {
         ...recent,
         [command]: [normalized, ...(recent[command] ?? []).filter(saved => saved !== normalized)].slice(0, 8)
+    };
+}
+
+function recordStat(command: StatCommand, guildId: string) {
+    const current = settings.store.stats ?? EMPTY_STATS;
+    const guild = current.guilds[guildId] ?? EMPTY_COUNTS;
+    settings.store.stats = {
+        total: { ...current.total, [command]: (current.total[command] ?? 0) + 1 },
+        guilds: {
+            ...current.guilds,
+            [guildId]: { ...guild, [command]: (guild[command] ?? 0) + 1 }
+        }
     };
 }
 
@@ -863,6 +956,7 @@ function makeActionItem(actionId: MenuActionId, user: User, guildId: string, cha
                 label={`Iolite - ${command[0].toUpperCase() + command.slice(1)}`}
                 color={command === "ban" ? "danger" : undefined}
                 action={() => openQuickPanel(command, user, guildId, channel)}
+                onContextMenu={(event: any) => openPresetContextMenu(event, command, user, guildId, channel)}
             />
         );
     }
@@ -919,8 +1013,22 @@ function isUnusedAction(child: ReactElement<any> | null | undefined): boolean {
 function isNativeQuickAction(child: ReactElement<any> | null | undefined): boolean {
     const id = String(child?.props?.id ?? "").toLowerCase();
     const label = typeof child?.props?.label === "string" ? child.props.label.toLowerCase() : "";
-    return ["profile", "mention", "message", "start a call", "add note"].includes(label)
-        || ["profile", "mention", "message", "call", "user-note", "add-note"].includes(id);
+    return ["profile", "mention", "message", "start a call", "add note", "apps", "roles", "role", "edit per-server profile"].includes(label)
+        || ["profile", "mention", "message", "call", "user-note", "add-note", "apps", "roles", "role"].includes(id)
+        || label.startsWith("edit per-server profile");
+}
+
+function pruneModerationModeItems(nodes: any[]): void {
+    for (let index = nodes.length - 1; index >= 0; index--) {
+        const node = nodes[index];
+        if (isNativeQuickAction(node)) {
+            nodes.splice(index, 1);
+            continue;
+        }
+
+        const nested = node?.props?.children;
+        if (Array.isArray(nested)) pruneModerationModeItems(nested);
+    }
 }
 
 const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: UserContextProps) => {
@@ -930,13 +1038,13 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: User
     const fastActionGroup = findGroupChildrenByChildId(["message", "call", "note"], children, true);
     if (!fastActionGroup) {
         children.splice(1, 0, <Menu.MenuGroup>{quickItems}</Menu.MenuGroup>);
+        if (settings.store.moderationModeEnabled && settings.store.moderationModeHideNativeQuickActions)
+            pruneModerationModeItems(children);
         return;
     }
 
     if (settings.store.moderationModeEnabled && settings.store.moderationModeHideNativeQuickActions) {
-        for (let index = fastActionGroup.length - 1; index >= 0; index--) {
-            if (isNativeQuickAction(fastActionGroup[index])) fastActionGroup.splice(index, 1);
-        }
+        pruneModerationModeItems(children);
     } else if (settings.store.replaceUnusedActions) {
         for (let index = fastActionGroup.length - 1; index >= 0; index--) {
             if (isUnusedAction(fastActionGroup[index])) fastActionGroup.splice(index, 1);
@@ -989,16 +1097,40 @@ const mentionStyle = {
 } as const;
 
 function EmbedText({ channelId, children }: { channelId?: string; children: unknown; }) {
-    const text = (typeof children === "string" ? children : String(children ?? "")).replace(/\n{3,}/g, "\n\n");
+    const text = (typeof children === "string" ? children : String(children ?? ""))
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/^>>>\s?/gm, "")
+        .replace(/^>\s?/gm, "");
     if (!text) return null;
     const channel = channelId ? ChannelStore.getChannel(channelId) : undefined;
     const guildId = channel?.guild_id;
-    const parts = text.split(/(\[[^\]]+\]\s*\(https?:\/\/[^)\s]+\)|https?:\/\/[^\s<]+|<@!?\d+>|<@&\d+>|<#\d+>|<a?:[A-Za-z0-9_]+:\d+>|\*\*[^*]+\*\*)/g);
+    const parts = text.split(/(\[[^\]]+\]\s*\(\s*<?https?:\/\/[^)>\s]+>?\s*\)|\[?<t:\d+(?::[tTdDfFR])?>\]?|https?:\/\/[^\s<]+|<@!?\d+>|<@&\d+>|<#\d+>|<a?:[A-Za-z0-9_]+:\d+>|\*\*[^*]+\*\*)/g);
 
     return <>{parts.map((part, index) => {
         if (!part) return null;
-        const markdownLink = part.match(/^\[([^\]]+)\]\s*\((https?:\/\/[^)\s]+)\)$/);
+        const markdownLink = part.match(/^\[([^\]]+)\]\s*\(\s*<?(https?:\/\/[^)>\s]+)>?\s*\)$/);
         if (markdownLink) return <a href={markdownLink[2]} key={index} rel="noreferrer" style={{ color: "var(--text-link)" }} target="_blank">{markdownLink[1]}</a>;
+        const timestamp = part.match(/^\[?<t:(\d+)(?::([tTdDfFR]))?>\]?$/);
+        if (timestamp) {
+            const date = new Date(Number(timestamp[1]) * 1_000);
+            const format = timestamp[2] ?? "f";
+            const locale = LocaleStore.locale || navigator.language;
+            const { timestampHourCycle } = UserSettingsProtoStore.settings.appearance;
+            const hour12 = timestampHourCycle === 1 ? true : timestampHourCycle === 2 ? false : undefined;
+            const options: Intl.DateTimeFormatOptions = format === "t" ? { hour: "numeric", minute: "2-digit", hour12 }
+                : format === "T" ? { hour: "numeric", minute: "2-digit", second: "2-digit", hour12 }
+                    : format === "d" ? { year: "numeric", month: "2-digit", day: "2-digit" }
+                        : format === "D" ? { year: "numeric", month: "long", day: "numeric" }
+                            : format === "F" ? { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12 }
+                                : { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", hour12 };
+            if (format === "R") {
+                const seconds = Math.round((date.getTime() - Date.now()) / 1_000);
+                const units: Array<[number, Intl.RelativeTimeFormatUnit]> = [[86400 * 365, "year"], [86400 * 30, "month"], [86400 * 7, "week"], [86400, "day"], [3600, "hour"], [60, "minute"]];
+                const [size, unit] = units.find(([size]) => Math.abs(seconds) >= size) ?? [1, "second"];
+                return <span key={index} title={date.toLocaleString(locale, { hour12 })}>{new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Math.round(seconds / size), unit)}</span>;
+            }
+            return <span key={index} title={date.toLocaleString(locale, { hour12 })}>{date.toLocaleString(locale, options)}</span>;
+        }
         if (/^https?:\/\//.test(part)) return <a href={part} key={index} rel="noreferrer" style={{ color: "var(--text-link)", overflowWrap: "anywhere" }} target="_blank">{part}</a>;
         const userMention = part.match(/^<@!?(\d+)>$/);
         if (userMention) {
@@ -1293,6 +1425,13 @@ function getPreset(index: 1 | 2 | 3): Preset {
     };
 }
 
+function getAllPresets(): Array<Preset & Partial<Pick<IolitePreset, "id" | "review">>> {
+    if (settings.store.presets?.length) return settings.store.presets;
+    return ([1, 2, 3] as const)
+        .map(getPreset)
+        .filter(preset => Boolean(preset.reason.trim() || preset.duration.trim() || preset.shortcut.trim()));
+}
+
 function normalizeShortcut(shortcut: string): string {
     const tokens = shortcut.toLowerCase().replaceAll(" ", "").split("+").filter(Boolean);
     const aliases: Record<string, string> = { control: "ctrl", cmd: "meta", command: "meta", option: "alt" };
@@ -1319,8 +1458,7 @@ function onPresetKeyDown(event: KeyboardEvent) {
     if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable='true']")) return;
 
     const eventShortcut = shortcutFromEvent(event);
-    const preset = ([1, 2, 3] as const)
-        .map(getPreset)
+    const preset = getAllPresets()
         .find(candidate => candidate.shortcut.trim() && normalizeShortcut(candidate.shortcut) === eventShortcut);
     if (!preset) return;
 
@@ -1333,25 +1471,7 @@ function onPresetKeyDown(event: KeyboardEvent) {
         return;
     }
 
-    const destinationId = getDestinationId(guildId, preset.destination);
-    if (!destinationId) {
-        showToast("That preset's destination channel is not configured.", Toasts.Type.FAILURE);
-        return;
-    }
-
-    beginPendingModerationCommand(preset.command, destinationId, guildId, activeProfileTarget.user);
-    void submitCommand(
-        destinationId,
-        buildCommand(
-            guildId,
-            preset.command,
-            activeProfileTarget.user.id,
-            preset.duration,
-            preset.reason
-        )
-    ).then(sent => {
-        if (!sent) clearPendingModerationCommand();
-    });
+    runPreset(preset, activeProfileTarget.user, guildId);
 }
 
 function ProfileTargetTracker({ guildId, user }: { guildId?: string; user: User; }) {
@@ -1406,6 +1526,10 @@ export default definePlugin({
     },
     profileTargetTracker,
     start() {
+        if (settings.store.dataVersion < 1) {
+            if (settings.store.lookupPanelTimeoutSeconds === 5) settings.store.lookupPanelTimeoutSeconds = 60;
+            settings.store.dataVersion = 1;
+        }
         window.addEventListener("keydown", onPresetKeyDown, true);
     },
     stop() {

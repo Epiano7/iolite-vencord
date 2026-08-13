@@ -94,6 +94,11 @@ export function ActionMenuEditor({ layouts, onChange }: ActionMenuEditorProps) {
         save(next);
     };
 
+    const moveBy = (id: MenuActionId, destination: keyof MenuLayout, offset: number) => {
+        const currentIndex = layout[destination].indexOf(id);
+        move(id, destination, Math.max(0, Math.min(layout[destination].length - 1, currentIndex + offset)));
+    };
+
     const rememberDropTarget = (event: ReactDragEvent, destination: keyof MenuLayout, index: number) => {
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
@@ -188,6 +193,28 @@ export function ActionMenuEditor({ layouts, onChange }: ActionMenuEditorProps) {
                     >
                         <span aria-hidden style={{ color: "var(--text-muted)", fontSize: 18 }}>⠿</span>
                         <span style={{ fontWeight: 600 }}>{actionLabel(id)}</span>
+                        <span style={{ display: "flex", gap: 3, marginLeft: "auto" }}>
+                            <button
+                                aria-label={`Move ${actionLabel(id)} up`}
+                                disabled={index === 0}
+                                onClick={() => moveBy(id, key, -1)}
+                                style={{ border: 0, background: "transparent", color: "inherit", cursor: index === 0 ? "default" : "pointer", opacity: index === 0 ? 0.3 : 0.8 }}
+                                type="button"
+                            >↑</button>
+                            <button
+                                aria-label={`Move ${actionLabel(id)} down`}
+                                disabled={index === layout[key].length - 1}
+                                onClick={() => moveBy(id, key, 1)}
+                                style={{ border: 0, background: "transparent", color: "inherit", cursor: index === layout[key].length - 1 ? "default" : "pointer", opacity: index === layout[key].length - 1 ? 0.3 : 0.8 }}
+                                type="button"
+                            >↓</button>
+                            <button
+                                aria-label={`${key === "order" ? "Hide" : "Show"} ${actionLabel(id)}`}
+                                onClick={() => move(id, key === "order" ? "hidden" : "order", key === "order" ? layout.hidden.length : layout.order.length)}
+                                style={{ border: 0, background: "transparent", color: "inherit", cursor: "pointer", opacity: 0.8 }}
+                                type="button"
+                            >{key === "order" ? "×" : "+"}</button>
+                        </span>
                     </div>
                 ))}
                 {layout[key].length === 0 && (
