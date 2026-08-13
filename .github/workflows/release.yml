@@ -68,7 +68,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force Vencord/src/userplugins/iolite | Out-Null
-          Copy-Item iolite/index.tsx,iolite/QuickPanel.tsx Vencord/src/userplugins/iolite/
+          Copy-Item iolite/index.tsx,iolite/QuickPanel.tsx,iolite/MenuEditor.tsx Vencord/src/userplugins/iolite/
 
       - name: Install Vencord dependencies
         working-directory: Vencord
@@ -78,7 +78,7 @@ jobs:
         working-directory: Vencord
         shell: pwsh
         run: |
-          pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx
+          pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx src/userplugins/iolite/MenuEditor.tsx
           pnpm testTsc
           node --require=./scripts/suppressExperimentalWarnings.js scripts/build/build.mjs --disable-updater
 
@@ -160,6 +160,7 @@ jobs:
           if ($preservation.ExitCode -ne 0) { throw "Source integration changed an existing user plugin" }
           if ((Get-Content "$otherPlugin/keep.txt" -Raw) -ne "must remain unchanged") { throw "Existing user plugin fixture changed" }
           if (-not (Test-Path "$sourceRoot/src/userplugins/iolite/index.tsx")) { throw "Iolite source was not installed beside the fixture plugin" }
+          if (-not (Test-Path "$sourceRoot/src/userplugins/iolite/MenuEditor.tsx")) { throw "Iolite menu editor source was not installed" }
 
           $rollbackRoot = Join-Path $env:RUNNER_TEMP "iolite-rollback-fixture"
           New-Item -ItemType Directory -Force "$rollbackRoot/src/userplugins/existing-plugin", "$rollbackRoot/dist" | Out-Null

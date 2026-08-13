@@ -4,8 +4,12 @@ All notable changes to Iolite will be documented here.
 
 ## Unreleased
 
+## 0.6.0 - 2026-08-13
+
 - Added configurable User Info and Cases lookups alongside View Warns.
 - Added optional Iolite actions to message context menus.
+- Added a visual drag-and-drop editor for independently reordering or hiding profile and message context-menu actions.
+- Added a Recent Messages action with server/channel scopes, pagination, and jump-to-message controls in the bottom-right panel.
 - Unified lookup response handling in Iolite's isolated panel and now renders every Sapphire embed in a response.
 - Added a configurable lookup-panel countdown that truly pauses on hover, keyboard focus, Discord blur, and window hiding.
 - Improved response matching with message timing and target-mention checks.

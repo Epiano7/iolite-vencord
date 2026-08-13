@@ -10,11 +10,13 @@ Iolite is a QoL [Vencord](https://vencord.dev) plugin for [Sapphire](https://sap
 ## Features
 
 - Use clearly labeled moderation and lookup actions directly from a user's or message's context menu—no Iolite dropdown.
+- Reorder those actions separately for profile and message menus with a visual drag-and-drop editor, or move actions such as Ban into Hidden.
 - Optionally replace **Start a Call** and **Add Note** with the fast moderation rows.
 - Enter a reason and optional duration in a small floating editor while the rest of Discord stays usable.
 - Reuse the eight most recent successful ban and mute reasons from the matching moderation popup.
 - Send to the current channel or a configured private moderation channel.
 - Show complete Sapphire Warns, User Info, and Cases responses in an isolated multi-embed panel.
+- Review a member's recent messages from the same bottom-right panel and jump directly to any result.
 - Automatically close lookup panels after a configurable delay that pauses on hover, keyboard focus, or when Discord is not active.
 - Relay Sapphire's recent-punishment confirmation buttons into the bottom-right panel without repeating the command.
 - Configure three named presets with an action, duration, reason, destination, and shortcut. Matching presets also appear as buttons in moderation popups.
@@ -94,6 +96,12 @@ The panel closes after five seconds by default. Hovering it, focusing anything i
 
 Enable or disable message right-click actions with **Enable Message Actions**. Server-specific User Info and Cases command names are available under **Iolite - Server Settings**.
 
+### Right-click menu editor and recent messages
+
+Open Iolite's normal Vencord settings and use **Right-click Menu Layout**. Choose the Profile or Message tab, then drag rows to set their top-to-bottom order. Drag an action into **Hidden** to remove it from that menu, or drag it back into **Visible actions** to restore it. The two layouts are independent, while **Iolite - Server Settings** remains pinned to the profile menu so configuration cannot become unreachable.
+
+**Iolite - Recent Messages** opens in the bottom-right without changing channels. It searches the current server by default, can be narrowed to the current channel, supports loading more results, and offers a **Jump** button for messages still accessible to the moderator. Iolite uses Discord's own message-search response and does not build or retain a separate message-history database.
+
 ### Recent-punishment confirmations
 
 When Sapphire asks whether to continue because a recent punishment already exists, Iolite mirrors Sapphire's real buttons in the bottom-right panel. Selecting one submits the original message-component interaction and immediately locks the panel against double clicks; it never repeats the punishment command. Use **Open original Sapphire message** if the interaction expires or Discord rejects it. This behavior can be disabled with **Relay Sapphire Confirmations** in Iolite's settings.
@@ -107,7 +115,7 @@ The repository's scheduled GitHub Actions workflow checks Iolite against the lat
 Place this repository at `Vencord/src/userplugins/iolite`, then run from the Vencord root:
 
 ```powershell
-pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx
+pnpm exec eslint src/userplugins/iolite/index.tsx src/userplugins/iolite/QuickPanel.tsx src/userplugins/iolite/MenuEditor.tsx
 pnpm testTsc
 pnpm build
 ```

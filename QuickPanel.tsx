@@ -32,6 +32,23 @@ export interface SapphireConfirmationChoice {
     type: number;
 }
 
+export type RecentMessageScope = "channel" | "server";
+
+export interface RecentMessageItem {
+    attachmentCount: number;
+    channelId: string;
+    channelName: string;
+    content: string;
+    id: string;
+    timestamp: string;
+}
+
+export interface RecentMessagePage {
+    messages: RecentMessageItem[];
+    nextOffset: number;
+    total: number;
+}
+
 interface SapphireConfirmationPanelProps {
     body: string;
     choices: SapphireConfirmationChoice[];
@@ -63,6 +80,18 @@ interface SapphireLookupPanelProps {
     onClose(): void;
     timeoutMs: number;
     title: string;
+    user: User;
+}
+
+interface RecentMessagesPanelProps {
+    currentChannelName: string;
+    defaultScope: RecentMessageScope;
+    gradientColor1?: string;
+    gradientColor2?: string;
+    loadPage(scope: RecentMessageScope, offset: number): Promise<RecentMessagePage>;
+    onClose(): void;
+    onJump(message: RecentMessageItem): void;
+    timeoutMs: number;
     user: User;
 }
 
@@ -554,5 +583,149 @@ export function SapphireLookupPanel({
                 </div>
             )}
         </section>
+    );
+}
+
+export function RecentMessagesPanel({
+    currentChannelName,
+    defaultScope,
+    gradientColor1,
+    gradientColor2,
+    loadPage,
+    onClose,
+    onJump,
+    timeoutMs,
+    user
+}: RecentMessagesPanelProps) {
+    const [scope, setScope] = useState<RecentMessageScope>(defaultScope);
+    const [messages, setMessages] = useState<RecentMessageItem[]>([]);
+    const [nextOffset, setNextOffset] = useState(0);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const requestIdRef = useRef(0);
+    const { palette } = getPanelTheme(gradientColor1, gradientColor2);
+
+    const fetchPage = async (nextScope: RecentMessageScope, offset: number, append: boolean) => {
+        const requestId = ++requestIdRef.current;
+        setLoading(true);
+        setError("");
+        try {
+            const page = await loadPage(nextScope, offset);
+            if (requestId !== requestIdRef.current) return;
+            setMessages(current => append ? [...current, ...page.messages.filter(item => !current.some(existing => existing.id === item.id))] : page.messages);
+            setNextOffset(page.nextOffset);
+            setTotal(page.total);
+        } catch (caught) {
+            if (requestId !== requestIdRef.current) return;
+            console.error("[Iolite] Failed to search recent messages", caught);
+            setError("Discord could not search this member's messages. Try again in a moment.");
+        } finally {
+            if (requestId === requestIdRef.current) setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setMessages([]);
+        void fetchPage(scope, 0, false);
+    }, [scope]);
+
+    const switchScope = (nextScope: RecentMessageScope) => {
+        if (nextScope !== scope) setScope(nextScope);
+    };
+
+    return (
+        <SapphireLookupPanel
+            gradientColor1={gradientColor1}
+            gradientColor2={gradientColor2}
+            onClose={onClose}
+            timeoutMs={timeoutMs}
+            title="Recent messages"
+            user={user}
+        >
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                {(["server", "channel"] as const).map(option => (
+                    <button
+                        key={option}
+                        type="button"
+                        onClick={() => switchScope(option)}
+                        style={{
+                            flex: 1,
+                            minHeight: 32,
+                            border: 0,
+                            borderRadius: 4,
+                            background: scope === option ? "#5865f2" : palette.button,
+                            color: scope === option ? "#fff" : palette.text,
+                            cursor: "pointer",
+                            fontWeight: 600
+                        }}
+                    >
+                        {option === "server" ? "This server" : `#${currentChannelName}`}
+                    </button>
+                ))}
+            </div>
+
+            {error && (
+                <div style={{ borderRadius: 5, padding: 10, background: "rgba(218, 55, 60, 0.15)", color: "#da373c" }}>
+                    {error}
+                </div>
+            )}
+            {!error && !loading && messages.length === 0 && (
+                <div style={{ padding: 16, textAlign: "center", color: palette.muted }}>No messages found.</div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {messages.map(message => (
+                    <div
+                        key={message.id}
+                        style={{
+                            border: `1px solid ${palette.border}`,
+                            borderRadius: 7,
+                            padding: 10,
+                            background: palette.input
+                        }}
+                    >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: palette.muted, fontSize: 11 }}>
+                            <span>#{message.channelName}</span>
+                            <span>{new Date(message.timestamp).toLocaleString()}</span>
+                        </div>
+                        <div style={{ marginTop: 6, whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.35 }}>
+                            {message.content || <span style={{ color: palette.muted, fontStyle: "italic" }}>No text content</span>}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 7 }}>
+                            <span style={{ color: palette.muted, fontSize: 11 }}>
+                                {message.attachmentCount > 0 ? `${message.attachmentCount} attachment${message.attachmentCount === 1 ? "" : "s"}` : ""}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => onJump(message)}
+                                style={{ border: 0, background: "transparent", color: "#00a8fc", cursor: "pointer", fontWeight: 600 }}
+                            >
+                                Jump to message
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {loading && <div style={{ padding: 12, textAlign: "center", color: palette.muted }}>Searching…</div>}
+            {!loading && messages.length > 0 && nextOffset < total && (
+                <button
+                    type="button"
+                    onClick={() => void fetchPage(scope, nextOffset, true)}
+                    style={{
+                        width: "100%",
+                        minHeight: 34,
+                        marginTop: 9,
+                        border: 0,
+                        borderRadius: 4,
+                        background: palette.button,
+                        color: palette.text,
+                        cursor: "pointer",
+                        fontWeight: 600
+                    }}
+                >
+                    Load more
+                </button>
+            )}
+        </SapphireLookupPanel>
     );
 }

@@ -31,11 +31,23 @@ import type { ReactElement } from "react";
 import type { Root } from "react-dom/client";
 
 import {
+    ActionMenuEditor,
+    DEFAULT_MENU_LAYOUTS,
+    type MenuActionId,
+    type MenuContext,
+    type MenuLayouts,
+    normalizeMenuLayout
+} from "./MenuEditor";
+import {
     QuickCommand,
     QuickDestination,
     QuickPanel,
     QuickPanelPreset,
     QuickPanelResult,
+    RecentMessageItem,
+    RecentMessagePage,
+    RecentMessageScope,
+    RecentMessagesPanel,
     SapphireConfirmationChoice,
     SapphireConfirmationPanel,
     SapphireLookupPanel
@@ -130,6 +142,20 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Show Iolite actions when right-clicking a message",
         default: true
+    },
+    actionMenuEditor: {
+        type: OptionType.COMPONENT,
+        component: () => (
+            <ActionMenuEditor
+                layouts={settings.store.menuLayouts ?? DEFAULT_MENU_LAYOUTS}
+                onChange={(context, layout) => {
+                    settings.store.menuLayouts = {
+                        ...settings.store.menuLayouts,
+                        [context]: layout
+                    };
+                }}
+            />
+        )
     },
     relaySapphireConfirmations: {
         type: OptionType.BOOLEAN,
@@ -290,6 +316,10 @@ const settings = definePluginSettings({
     guildConfigs: {
         type: OptionType.CUSTOM,
         default: {} as Record<string, GuildConfig>
+    },
+    menuLayouts: {
+        type: OptionType.CUSTOM,
+        default: DEFAULT_MENU_LAYOUTS as MenuLayouts
     },
     recentReasons: {
         type: OptionType.CUSTOM,
@@ -668,25 +698,113 @@ async function viewLookup(type: LookupType, user: User, guildId: string, channel
     if (!sent) clearPendingLookup();
 }
 
-function makeQuickItems(user: User, guildId: string, channel?: Channel, includeSettings = true): ReactElement[] {
-    const items = (["warn", "mute", "kick", "ban"] as const).map(command => (
-        <Menu.MenuItem
-            id={`vc-iolite-${command}`}
-            key={`vc-iolite-${command}`}
-            label={`Iolite - ${command[0].toUpperCase() + command.slice(1)}`}
-            color={command === "ban" ? "danger" : undefined}
-            action={() => openQuickPanel(command, user, guildId, channel)}
-        />
-    ));
+async function searchRecentMessages(
+    scope: RecentMessageScope,
+    guildId: string,
+    channelId: string,
+    userId: string,
+    offset: number
+): Promise<RecentMessagePage> {
+    const response = await RestAPI.get({
+        url: scope === "server"
+            ? `/guilds/${guildId}/messages/search`
+            : `/channels/${channelId}/messages/search`,
+        query: {
+            author_id: userId,
+            offset
+        },
+        retries: 1
+    });
+    const body = response.body ?? {};
+    if (body.retry_after) throw new Error(`Discord is still indexing messages; retry after ${body.retry_after} seconds.`);
 
-    items.push(...(["warns", "userinfo", "cases"] as const).map(type => (
+    const groups = Array.isArray(body.messages) ? body.messages : [];
+    const rawMessages = groups.flatMap((group: unknown) => Array.isArray(group) ? group : [group]);
+    const seen = new Set<string>();
+    const messages = rawMessages
+        .filter((message: any) => message?.id && message.author?.id === userId && !seen.has(message.id) && seen.add(message.id))
+        .sort((left: any, right: any) => String(right.id).localeCompare(String(left.id)))
+        .map((message: any): RecentMessageItem => ({
+            attachmentCount: Array.isArray(message.attachments) ? message.attachments.length : 0,
+            channelId: message.channel_id,
+            channelName: ChannelStore.getChannel(message.channel_id)?.name ?? "unknown-channel",
+            content: String(message.content ?? ""),
+            id: message.id,
+            timestamp: message.timestamp ?? new Date(SnowflakeUtils.extractTimestamp(message.id)).toISOString()
+        }));
+
+    return {
+        messages,
+        nextOffset: groups.length > 0 ? offset + groups.length : Number(body.total_results) || offset,
+        total: Math.max(Number(body.total_results) || messages.length, offset + messages.length)
+    };
+}
+
+function openRecentMessages(user: User, guildId: string, channel?: Channel) {
+    ContextMenuApi.closeContextMenu();
+    const channelId = getCurrentChannelId(channel);
+    if (!channelId) {
+        showToast("Iolite could not find the current channel.", Toasts.Type.FAILURE);
+        return;
+    }
+    const currentChannel = ChannelStore.getChannel(channelId);
+    mountQuickPanel(
+        <RecentMessagesPanel
+            currentChannelName={currentChannel?.name ?? "current-channel"}
+            defaultScope="server"
+            gradientColor1={normalizeHexColor(settings.store.quickPanelColor1)}
+            gradientColor2={normalizeHexColor(settings.store.quickPanelColor2)}
+            loadPage={(scope, offset) => searchRecentMessages(scope, guildId, channelId, user.id, offset)}
+            onClose={closeQuickPanel}
+            onJump={message => {
+                NavigationRouter.transitionTo(`/channels/${guildId}/${message.channelId}/${message.id}`);
+                closeQuickPanel();
+            }}
+            timeoutMs={getLookupPanelTimeoutMs()}
+            user={user}
+        />
+    );
+}
+
+function makeActionItem(actionId: MenuActionId, user: User, guildId: string, channel?: Channel): ReactElement {
+    if (["warn", "mute", "kick", "ban"].includes(actionId)) {
+        const command = actionId as PunishmentCommand;
+        return (
+            <Menu.MenuItem
+                id={`vc-iolite-${command}`}
+                key={`vc-iolite-${command}`}
+                label={`Iolite - ${command[0].toUpperCase() + command.slice(1)}`}
+                color={command === "ban" ? "danger" : undefined}
+                action={() => openQuickPanel(command, user, guildId, channel)}
+            />
+        );
+    }
+
+    if (actionId === "recentMessages") {
+        return (
+            <Menu.MenuItem
+                id="vc-iolite-recent-messages"
+                key="vc-iolite-recent-messages"
+                label="Iolite - Recent Messages"
+                action={() => openRecentMessages(user, guildId, channel)}
+            />
+        );
+    }
+
+    const type = actionId as LookupType;
+    return (
         <Menu.MenuItem
             id={`vc-iolite-${type}`}
             key={`vc-iolite-${type}`}
             label={`Iolite - ${LOOKUP_LABELS[type].action}`}
             action={() => void viewLookup(type, user, guildId, channel)}
         />
-    )));
+    );
+}
+
+function makeQuickItems(user: User, guildId: string, channel: Channel | undefined, context: MenuContext, includeSettings = true): ReactElement[] {
+    const layout = normalizeMenuLayout(settings.store.menuLayouts?.[context]);
+    const items = layout.order.map(actionId => makeActionItem(actionId, user, guildId, channel));
 
     if (includeSettings) items.push(
         <Menu.MenuItem
@@ -714,7 +832,7 @@ function isUnusedAction(child: ReactElement<any> | null | undefined): boolean {
 const UserContextMenuPatch: NavContextMenuPatchCallback = (children, props: UserContextProps) => {
     if (!props.guildId || !props.user) return;
 
-    const quickItems = makeQuickItems(props.user, props.guildId, props.channel);
+    const quickItems = makeQuickItems(props.user, props.guildId, props.channel, "profile");
     const fastActionGroup = findGroupChildrenByChildId(["message", "call", "note"], children, true);
     if (!fastActionGroup) {
         children.splice(1, 0, <Menu.MenuGroup>{quickItems}</Menu.MenuGroup>);
@@ -739,7 +857,7 @@ const MessageContextMenuPatch: NavContextMenuPatchCallback = (children, props: M
     if (!guildId) return;
     children.push(
         <Menu.MenuGroup key="vc-iolite-message-actions">
-            {makeQuickItems(props.message.author, guildId, props.channel, false)}
+            {makeQuickItems(props.message.author, guildId, props.channel, "message", false)}
         </Menu.MenuGroup>
     );
 };

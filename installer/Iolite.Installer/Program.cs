@@ -193,12 +193,16 @@ internal static class InstallerEngine
         bool pluginFilesChanged = false;
         string indexPath = Path.Combine(targetRoot, "index.tsx");
         string panelPath = Path.Combine(targetRoot, "QuickPanel.tsx");
+        string menuEditorPath = Path.Combine(targetRoot, "MenuEditor.tsx");
         byte[] releaseIndex = InstallerResources.ReadBytes("source.index.tsx");
         byte[] releasePanel = InstallerResources.ReadBytes("source.QuickPanel.tsx");
+        byte[] releaseMenuEditor = InstallerResources.ReadBytes("source.MenuEditor.tsx");
 
         if (Directory.Exists(targetRoot) && !managedTarget)
         {
-            bool sameRelease = FilesEqual(indexPath, releaseIndex) && FilesEqual(panelPath, releasePanel);
+            bool sameRelease = FilesEqual(indexPath, releaseIndex)
+                && FilesEqual(panelPath, releasePanel)
+                && FilesEqual(menuEditorPath, releaseMenuEditor);
             if (!sameRelease)
             {
                 throw new InvalidOperationException(
@@ -217,6 +221,7 @@ internal static class InstallerEngine
             Directory.CreateDirectory(backupPluginRoot);
             BackupFile(indexPath, Path.Combine(backupPluginRoot, "index.tsx"));
             BackupFile(panelPath, Path.Combine(backupPluginRoot, "QuickPanel.tsx"));
+            BackupFile(menuEditorPath, Path.Combine(backupPluginRoot, "MenuEditor.tsx"));
             BackupFile(markerPath, Path.Combine(backupPluginRoot, ".iolite-installer-managed"));
         }
         else
@@ -241,7 +246,7 @@ internal static class InstallerEngine
             RunPnpm(pnpm, sourceRoot, "install", "--frozen-lockfile");
 
             report(52, "Validating all user plugins…", "Linting and type-checking the combined Vencord source tree.");
-            RunPnpm(pnpm, sourceRoot, "exec", "eslint", "src/userplugins/iolite/index.tsx", "src/userplugins/iolite/QuickPanel.tsx");
+            RunPnpm(pnpm, sourceRoot, "exec", "eslint", "src/userplugins/iolite/index.tsx", "src/userplugins/iolite/QuickPanel.tsx", "src/userplugins/iolite/MenuEditor.tsx");
             RunPnpm(pnpm, sourceRoot, "testTsc");
 
             report(68, "Building Vencord with every user plugin…", "Iolite and the existing custom plugins are compiled into one runtime.");
@@ -410,7 +415,8 @@ internal static class InstallerEngine
 
         bool siblingsUnchanged = siblingsBefore.All(entry => File.Exists(entry.Key) && FileHash(entry.Key) == entry.Value);
         bool sourcePresent = File.Exists(Path.Combine(userPluginsRoot, "iolite", "index.tsx"))
-            && File.Exists(Path.Combine(userPluginsRoot, "iolite", "QuickPanel.tsx"));
+            && File.Exists(Path.Combine(userPluginsRoot, "iolite", "QuickPanel.tsx"))
+            && File.Exists(Path.Combine(userPluginsRoot, "iolite", "MenuEditor.tsx"));
         return siblingsUnchanged && sourcePresent ? 0 : 1;
     }
 
@@ -471,6 +477,7 @@ internal static class InstallerEngine
         Directory.CreateDirectory(targetRoot);
         File.WriteAllBytes(Path.Combine(targetRoot, "index.tsx"), InstallerResources.ReadBytes("source.index.tsx"));
         File.WriteAllBytes(Path.Combine(targetRoot, "QuickPanel.tsx"), InstallerResources.ReadBytes("source.QuickPanel.tsx"));
+        File.WriteAllBytes(Path.Combine(targetRoot, "MenuEditor.tsx"), InstallerResources.ReadBytes("source.MenuEditor.tsx"));
         File.WriteAllText(
             Path.Combine(targetRoot, ".iolite-installer-managed"),
             $"Managed by Iolite Installer {version}{Environment.NewLine}"
@@ -610,12 +617,19 @@ internal static class InstallerEngine
 
         RestoreFile(Path.Combine(backupPluginRoot, "index.tsx"), Path.Combine(targetRoot, "index.tsx"));
         RestoreFile(Path.Combine(backupPluginRoot, "QuickPanel.tsx"), Path.Combine(targetRoot, "QuickPanel.tsx"));
+        RestoreFileOrDelete(Path.Combine(backupPluginRoot, "MenuEditor.tsx"), Path.Combine(targetRoot, "MenuEditor.tsx"));
         RestoreFile(Path.Combine(backupPluginRoot, ".iolite-installer-managed"), Path.Combine(targetRoot, ".iolite-installer-managed"));
     }
 
     private static void RestoreFile(string backup, string destination)
     {
         if (File.Exists(backup)) File.Copy(backup, destination, true);
+    }
+
+    private static void RestoreFileOrDelete(string backup, string destination)
+    {
+        if (File.Exists(backup)) File.Copy(backup, destination, true);
+        else if (File.Exists(destination)) File.Delete(destination);
     }
 
     private static void TrimSourceBackups(string backupsRoot)
