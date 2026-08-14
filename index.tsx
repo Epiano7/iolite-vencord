@@ -687,24 +687,6 @@ function runPreset(preset: Preset, user: User, guildId: string, channel?: Channe
     });
 }
 
-function openPresetContextMenu(event: any, command: PunishmentCommand, user: User, guildId: string, channel?: Channel) {
-    event.preventDefault();
-    event.stopPropagation();
-    const presets = getAllPresets().filter(preset => preset.command === command);
-    ContextMenuApi.openContextMenu(event, () => (
-        <Menu.Menu navId={`vc-iolite-${command}-presets`} onClose={ContextMenuApi.closeContextMenu} aria-label={`${command} presets`}>
-            {presets.length
-                ? presets.map(preset => <Menu.MenuItem
-                    id={`vc-iolite-preset-${preset.id ?? preset.name}`}
-                    key={preset.id ?? preset.name}
-                    label={preset.name.trim() || "Unnamed preset"}
-                    action={() => runPreset(preset, user, guildId, channel)}
-                />)
-                : <Menu.MenuItem id="vc-iolite-no-presets" label="No presets configured" disabled />}
-        </Menu.Menu>
-    ));
-}
-
 function normalizeHexColor(value: string): string | undefined {
     const trimmed = value.trim();
     const normalized = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
@@ -949,14 +931,39 @@ function openRecentMessages(user: User, guildId: string, channel?: Channel) {
 function makeActionItem(actionId: MenuActionId, user: User, guildId: string, channel?: Channel): ReactElement {
     if (["warn", "mute", "kick", "ban"].includes(actionId)) {
         const command = actionId as PunishmentCommand;
+        const label = `Iolite - ${command[0].toUpperCase() + command.slice(1)}`;
+        const presets = getAllPresets().filter(preset => preset.command === command);
+        if (presets.length) return (
+            <Menu.MenuItem
+                id={`vc-iolite-${command}`}
+                key={`vc-iolite-${command}`}
+                label={label}
+                color={command === "ban" ? "danger" : undefined}
+            >
+                <Menu.MenuItem
+                    id={`vc-iolite-${command}-custom`}
+                    key={`vc-iolite-${command}-custom`}
+                    label={`Custom ${command}…`}
+                    color={command === "ban" ? "danger" : undefined}
+                    action={() => openQuickPanel(command, user, guildId, channel)}
+                />
+                <Menu.MenuSeparator />
+                {presets.map(preset => <Menu.MenuItem
+                    id={`vc-iolite-preset-${preset.id ?? preset.name}`}
+                    key={preset.id ?? preset.name}
+                    label={preset.name.trim() || "Unnamed preset"}
+                    color={command === "ban" ? "danger" : undefined}
+                    action={() => runPreset(preset, user, guildId, channel)}
+                />)}
+            </Menu.MenuItem>
+        );
         return (
             <Menu.MenuItem
                 id={`vc-iolite-${command}`}
                 key={`vc-iolite-${command}`}
-                label={`Iolite - ${command[0].toUpperCase() + command.slice(1)}`}
+                label={label}
                 color={command === "ban" ? "danger" : undefined}
                 action={() => openQuickPanel(command, user, guildId, channel)}
-                onContextMenu={(event: any) => openPresetContextMenu(event, command, user, guildId, channel)}
             />
         );
     }

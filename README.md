@@ -29,7 +29,7 @@ The installer supports standard Vencord and existing source-built installations.
 - Automatically close lookup panels after a configurable delay that pauses on hover, keyboard focus, or when Discord is not active.
 - Relay Sapphire's recent-punishment confirmation buttons into the bottom-right panel without repeating the command.
 - Build an unlimited list of named punishment presets with actions, reasons, durations, destinations, review flags, ordering, and keyboard shortcuts.
-- Right-click an Iolite punishment row to run a matching preset immediately, or use the full moderation popup when details need review.
+- Open an Iolite punishment submenu to run a matching preset immediately, or choose its Custom action when details need review.
 - Track successful Iolite warns, mutes, kicks, and bans globally or per server and export a shareable statistics card.
 - Customize the popup with one solid hex color or a two-color diagonal gradient.
 - Store a different Sapphire prefix for each server.
@@ -89,7 +89,7 @@ Iolite verifies that the configured private destination belongs to the current s
 
 ### Punishment presets and shortcuts
 
-Open Iolite's normal Vencord settings and use the visual preset manager to add, remove, or reorder presets. Each preset can define a name, action, duration, reason, destination, Sapphire review flag, and optional shortcut. Right-click **Iolite - Warn**, **Mute**, **Kick**, or **Ban** in a member menu to see only matching preset names and send one immediately. Normal clicking still opens the complete moderation popup, where matching presets can fill the form for review.
+Open Iolite's normal Vencord settings and use the visual preset manager to add, remove, or reorder presets. Each preset can define a name, action, duration, reason, destination, Sapphire review flag, and optional shortcut. When presets exist for **Iolite - Warn**, **Mute**, **Kick**, or **Ban**, that action becomes a native Discord submenu. Open its arrow, then select a preset name to send it immediately or choose **Custom …** to open the complete moderation popup. Actions without matching presets continue to open the full popup directly.
 
 Left-click a member to open their profile, then press the configured shortcut. Iolite ignores preset shortcuts while you are typing in chat, a reason field, or another text input. A private preset fails safely instead of sending publicly when its private channel is unavailable.
 

@@ -66,7 +66,7 @@ export function PresetEditor({ onChange, presets }: PresetEditorProps) {
         <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Punishment presets</div>
             <div style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 3 }}>
-                Right-click an Iolite punishment in a member menu to run one of its presets immediately.
+                Open an Iolite punishment submenu in a member menu to run one of its presets immediately.
             </div>
         </div>
         {local.map((preset, index) => <div key={preset.id} style={{ background: "var(--background-secondary)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 10 }}>

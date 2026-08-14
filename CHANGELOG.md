@@ -4,6 +4,11 @@ All notable changes to Iolite will be documented here.
 
 ## Unreleased
 
+## 0.7.1 - 2026-08-14
+
+- Fixed punishment presets being unreachable because Discord menu items discard custom right-click handlers.
+- Punishments with matching presets now use a native Discord submenu containing a Custom action and preset names; punishments without presets retain their direct full-editor action.
+
 ## 0.7.0 - 2026-08-13
 
 - Added a persistent chat-bar hammer for Moderation Mode. Its focused member menu keeps Iolite actions and Open in Mod View while hiding unrelated Discord and third-party rows.
