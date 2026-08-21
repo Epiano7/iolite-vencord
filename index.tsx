@@ -1095,13 +1095,6 @@ function embedColor(color: unknown): string {
     return "var(--brand-500)";
 }
 
-function isSplitSapphireCaseField(field: any): boolean {
-    const name = String(field?.name ?? "").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
-    const value = String(field?.value ?? "").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
-    return /\[[^\]]+\]$/.test(name)
-        && /^\(\s*<?https?:\/\/discord\.com\/channels\/\d+\/\d+\/\d+>?\s*\)\s*:/.test(value);
-}
-
 const mentionStyle = {
     background: "color-mix(in srgb, var(--brand-500) 25%, transparent)",
     borderRadius: 3,
@@ -1200,7 +1193,9 @@ function EmbedText({ channelId, children }: { channelId?: string; children: unkn
             src={`https://cdn.discordapp.com/emojis/${emoji[3]}.${emoji[1] ? "gif" : "webp"}?size=40&quality=lossless`}
             style={{ height: "1.35em", margin: "0 1px", objectFit: "contain", verticalAlign: "-0.3em", width: "1.35em" }}
         />;
-        if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>
+            <EmbedText channelId={channelId}>{part.slice(2, -2)}</EmbedText>
+        </strong>;
         if (part.startsWith("`") && part.endsWith("`")) return <code key={index} style={{ background: "var(--background-tertiary)", borderRadius: 3, fontFamily: "var(--font-code)", fontSize: "0.9em", padding: "1px 3px" }}>{part.slice(1, -1)}</code>;
         return part;
     })}</>;
@@ -1251,16 +1246,10 @@ function SapphireEmbedCard({ channelId, embed }: { channelId?: string; embed: an
                 </div>
                 {!!embed.fields?.length && <div style={{ display: "grid", gap: "10px 16px", gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))", marginTop: 10 }}>
                     {embed.fields.map((field: any, index: number) => <div key={index} style={{ gridColumn: field.inline ? "span 1" : "1 / -1", minWidth: 0 }}>
-                        {isSplitSapphireCaseField(field)
-                            ? <div style={{ fontSize: "inherit", lineHeight: 1.42, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
-                                <EmbedText channelId={channelId}>{`${field.name}\n${field.value}`}</EmbedText>
-                            </div>
-                            : <>
-                                <div style={{ fontSize: "inherit", fontWeight: 650, marginBottom: 3 }}><EmbedText channelId={channelId}>{field.name}</EmbedText></div>
-                                <div style={{ fontSize: "inherit", lineHeight: 1.42, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
-                                    <EmbedText channelId={channelId}>{field.value}</EmbedText>
-                                </div>
-                            </>}
+                        <div style={{ fontSize: "inherit", fontWeight: 650, marginBottom: 3 }}><EmbedText channelId={channelId}>{field.name}</EmbedText></div>
+                        <div style={{ fontSize: "inherit", lineHeight: 1.42, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                            <EmbedText channelId={channelId}>{field.value}</EmbedText>
+                        </div>
                     </div>)}
                 </div>}
                 {image && <img alt="" src={image} style={{ borderRadius: 4, display: "block", marginTop: 16, maxHeight: 300, maxWidth: "100%", objectFit: "contain" }} />}
@@ -1570,6 +1559,8 @@ export default definePlugin({
     },
     profileTargetTracker,
     start() {
+        const storeWithDiagnostic = settings.store as typeof settings.store & { lastLookupDebug?: string; };
+        if (storeWithDiagnostic.lastLookupDebug !== undefined) storeWithDiagnostic.lastLookupDebug = undefined;
         if (settings.store.dataVersion < 1) {
             if (settings.store.lookupPanelTimeoutSeconds === 5) settings.store.lookupPanelTimeoutSeconds = 60;
             settings.store.dataVersion = 1;
