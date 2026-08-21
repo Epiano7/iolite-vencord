@@ -1095,6 +1095,13 @@ function embedColor(color: unknown): string {
     return "var(--brand-500)";
 }
 
+function isSplitSapphireCaseField(field: any): boolean {
+    const name = String(field?.name ?? "").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+    const value = String(field?.value ?? "").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+    return /\[[^\]]+\]$/.test(name)
+        && /^\(\s*<?https?:\/\/discord\.com\/channels\/\d+\/\d+\/\d+>?\s*\)\s*:/.test(value);
+}
+
 const mentionStyle = {
     background: "color-mix(in srgb, var(--brand-500) 25%, transparent)",
     borderRadius: 3,
@@ -1244,10 +1251,16 @@ function SapphireEmbedCard({ channelId, embed }: { channelId?: string; embed: an
                 </div>
                 {!!embed.fields?.length && <div style={{ display: "grid", gap: "10px 16px", gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))", marginTop: 10 }}>
                     {embed.fields.map((field: any, index: number) => <div key={index} style={{ gridColumn: field.inline ? "span 1" : "1 / -1", minWidth: 0 }}>
-                        <div style={{ fontSize: "inherit", fontWeight: 650, marginBottom: 3 }}><EmbedText channelId={channelId}>{field.name}</EmbedText></div>
-                        <div style={{ fontSize: "inherit", lineHeight: 1.42, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
-                            <EmbedText channelId={channelId}>{field.value}</EmbedText>
-                        </div>
+                        {isSplitSapphireCaseField(field)
+                            ? <div style={{ fontSize: "inherit", lineHeight: 1.42, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                                <EmbedText channelId={channelId}>{`${field.name}\n${field.value}`}</EmbedText>
+                            </div>
+                            : <>
+                                <div style={{ fontSize: "inherit", fontWeight: 650, marginBottom: 3 }}><EmbedText channelId={channelId}>{field.name}</EmbedText></div>
+                                <div style={{ fontSize: "inherit", lineHeight: 1.42, overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}>
+                                    <EmbedText channelId={channelId}>{field.value}</EmbedText>
+                                </div>
+                            </>}
                     </div>)}
                 </div>}
                 {image && <img alt="" src={image} style={{ borderRadius: 4, display: "block", marginTop: 16, maxHeight: 300, maxWidth: "100%", objectFit: "contain" }} />}
