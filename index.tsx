@@ -1106,18 +1106,26 @@ const mentionStyle = {
 
 function EmbedText({ channelId, children }: { channelId?: string; children: unknown; }) {
     const text = (typeof children === "string" ? children : String(children ?? ""))
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replaceAll("\\[", "[")
+        .replaceAll("\\]", "]")
+        .replaceAll("\\(", "(")
+        .replaceAll("\\)", ")")
+        .replaceAll("\\`", "`")
         .replace(/\n{3,}/g, "\n\n")
         .replace(/^>>>\s?/gm, "")
         .replace(/^>\s?/gm, "");
     if (!text) return null;
     const channel = channelId ? ChannelStore.getChannel(channelId) : undefined;
     const guildId = channel?.guild_id;
-    const parts = text.split(/(\[[^\]]+\]\s*\(\s*<?https?:\/\/[^)>\s]+>?\s*\)|\[?<t:\d+(?::[tTdDfFR])?>\]?|https?:\/\/[^\s<]+|<@!?\d+>|<@&\d+>|<#\d+>|<a?:[A-Za-z0-9_]+:\d+>|\*\*[^*]+\*\*)/g);
+    const parts = text.split(/(\[[^\]]+\][\s\u00A0]*\([\s\u00A0]*<?https?:\/\/[^)>\s]+>?[\s\u00A0]*\)|\[?<t:\d+(?::[tTdDfFR])?>\]?|\(?https?:\/\/discord\.com\/channels\/\d+\/\d+\/\d+\)?|https?:\/\/[^\s<]+|<@!?\d+>|<@&\d+>|<#\d+>|<a?:[A-Za-z0-9_]+:\d+>|\*\*[^*]+\*\*|`[^`\n]+`)/g);
 
     return <>{parts.map((part, index) => {
         if (!part) return null;
-        const markdownLink = part.match(/^\[([^\]]+)\]\s*\(\s*<?(https?:\/\/[^)>\s]+)>?\s*\)$/);
-        if (markdownLink) return <a href={markdownLink[2]} key={index} rel="noreferrer" style={{ color: "var(--text-link)" }} target="_blank">{markdownLink[1]}</a>;
+        const markdownLink = part.match(/^\[([^\]]+)\][\s\u00A0]*\([\s\u00A0]*<?(https?:\/\/[^)>\s]+)>?[\s\u00A0]*\)$/);
+        if (markdownLink) return <a href={markdownLink[2]} key={index} rel="noreferrer" style={{ color: "var(--text-link)", fontWeight: 500, textDecoration: "none" }} target="_blank">
+            <EmbedText channelId={channelId}>{markdownLink[1]}</EmbedText>
+        </a>;
         const timestamp = part.match(/^\[?<t:(\d+)(?::([tTdDfFR]))?>\]?$/);
         if (timestamp) {
             const date = new Date(Number(timestamp[1]) * 1_000);
@@ -1138,6 +1146,20 @@ function EmbedText({ channelId, children }: { channelId?: string; children: unkn
                 return <span key={index} title={date.toLocaleString(locale, { hour12 })}>{new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Math.round(seconds / size), unit)}</span>;
             }
             return <span key={index} title={date.toLocaleString(locale, { hour12 })}>{date.toLocaleString(locale, options)}</span>;
+        }
+        const discordMessageLink = part.match(/^\(?(https?:\/\/discord\.com\/channels\/(\d+)\/(\d+)\/(\d+))\)?$/);
+        if (discordMessageLink) {
+            const linkedChannel = ChannelStore.getChannel(discordMessageLink[3]);
+            return <a
+                href={discordMessageLink[1]}
+                key={index}
+                rel="noreferrer"
+                style={{ color: "var(--text-link)", fontWeight: 500, textDecoration: "none" }}
+                target="_blank"
+                title="Open the original Sapphire case message"
+            >
+                {linkedChannel ? `#${linkedChannel.name}` : "Open message"}
+            </a>;
         }
         if (/^https?:\/\//.test(part)) return <a href={part} key={index} rel="noreferrer" style={{ color: "var(--text-link)", overflowWrap: "anywhere" }} target="_blank">{part}</a>;
         const userMention = part.match(/^<@!?(\d+)>$/);
@@ -1172,6 +1194,7 @@ function EmbedText({ channelId, children }: { channelId?: string; children: unkn
             style={{ height: "1.35em", margin: "0 1px", objectFit: "contain", verticalAlign: "-0.3em", width: "1.35em" }}
         />;
         if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith("`") && part.endsWith("`")) return <code key={index} style={{ background: "var(--background-tertiary)", borderRadius: 3, fontFamily: "var(--font-code)", fontSize: "0.9em", padding: "1px 3px" }}>{part.slice(1, -1)}</code>;
         return part;
     })}</>;
 }

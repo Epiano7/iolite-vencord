@@ -4,10 +4,11 @@ All notable changes to Iolite will be documented here.
 
 ## Unreleased
 
-## 0.7.1 - 2026-08-14
+## 0.7.1 - 2026-08-20
 
 - Fixed punishment presets being unreachable because Discord menu items discard custom right-click handlers.
 - Punishments with matching presets now use a native Discord submenu containing a Custom action and preset names; punishments without presets retain their direct full-editor action.
+- Updated Sapphire embed formatting for its newer warning-list output, including escaped or invisibly separated Markdown, inline case IDs, and compact Discord message links.
 
 ## 0.7.0 - 2026-08-13
 
