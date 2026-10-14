@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { GuildStore, showToast, Toasts, useState } from "@webpack/common";
+import { GuildStore, showToast, useState } from "@webpack/common";
 
 export type StatCommand = "ban" | "kick" | "mute" | "warn";
 export type StatCounts = Record<StatCommand, number>;
@@ -65,7 +65,7 @@ export function StatsPanel({ stats }: StatsPanelProps) {
         link.download = `iolite-stats-${guildId === "all" ? "all-servers" : guildId}.png`;
         link.href = canvas.toDataURL("image/png");
         link.click();
-        showToast("Iolite stats image generated.", Toasts.Type.SUCCESS);
+        showToast("Iolite stats image generated.", "success");
     };
 
     return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

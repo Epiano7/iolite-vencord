@@ -26,7 +26,6 @@ import {
     SelectedGuildStore,
     showToast,
     SnowflakeUtils,
-    Toasts,
     useEffect,
     UserSettingsProtoStore,
     UserStore,
@@ -221,7 +220,7 @@ const settings = definePluginSettings({
         component: () => (
             <Button onClick={() => {
                 settings.store.recentReasons = { ban: [], mute: [] };
-                showToast("Iolite's saved ban and mute reasons were cleared.", Toasts.Type.SUCCESS);
+                showToast("Iolite's saved ban and mute reasons were cleared.", "success");
             }}>
                 Clear saved ban and mute reasons
             </Button>
@@ -441,7 +440,7 @@ const ModerationModeButton: ChatBarButtonFactory = ({ channel, isMainChat }) => 
         const next = !enabled;
         settings.store.moderationModeEnabled = next;
         setEnabled(next);
-        showToast(`Moderation Mode ${next ? "enabled" : "disabled"}.`, Toasts.Type.SUCCESS);
+        showToast(`Moderation Mode ${next ? "enabled" : "disabled"}.`, "success");
     };
 
     return (
@@ -508,7 +507,7 @@ function buildCommand(
 
 async function submitCommand(channelId: string | undefined, command: string) {
     if (!channelId) {
-        showToast("Iolite could not find a destination channel.", Toasts.Type.FAILURE);
+        showToast("Iolite could not find a destination channel.", "failure");
         return false;
     }
 
@@ -516,11 +515,11 @@ async function submitCommand(channelId: string | undefined, command: string) {
         const isBackgroundChannel = channelId !== SelectedChannelStore.getChannelId();
         await sendMessage(channelId, { content: command }, !isBackgroundChannel);
         ContextMenuApi.closeContextMenu();
-        showToast("Sapphire command sent.", Toasts.Type.SUCCESS);
+        showToast("Sapphire command sent.", "success");
         return true;
     } catch (error) {
         console.error("[Iolite] Failed to send command", error);
-        showToast("Sapphire command failed to send.", Toasts.Type.FAILURE);
+        showToast("Sapphire command failed to send.", "failure");
         return false;
     }
 }
@@ -647,7 +646,7 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
             onSubmit={(result: QuickPanelResult) => {
                 const destinationId = getDestinationId(guildId, result.destination, channel);
                 if (!destinationId) {
-                    showToast("Iolite could not find that destination channel.", Toasts.Type.FAILURE);
+                    showToast("Iolite could not find that destination channel.", "failure");
                     return;
                 }
 
@@ -671,7 +670,7 @@ function openQuickPanel(command: QuickCommand, user: User, guildId: string, chan
 function runPreset(preset: Preset, user: User, guildId: string, channel?: Channel) {
     const destinationId = getDestinationId(guildId, preset.destination, channel);
     if (!destinationId) {
-        showToast("That preset's destination channel is not configured.", Toasts.Type.FAILURE);
+        showToast("That preset's destination channel is not configured.", "failure");
         return;
     }
 
@@ -813,13 +812,13 @@ async function viewLookup(type: LookupType, user: User, guildId: string, channel
     const destination = getDefaultDestination(guildId);
     const destinationId = getDestinationId(guildId, destination, channel);
     if (!destinationId) {
-        showToast("Iolite could not find a destination channel.", Toasts.Type.FAILURE);
+        showToast("Iolite could not find a destination channel.", "failure");
         return;
     }
 
     const command = getLookupCommand(guildId, type);
     if (!command) {
-        showToast(`${LOOKUP_LABELS[type].action} is disabled because its command name is empty.`, Toasts.Type.FAILURE);
+        showToast(`${LOOKUP_LABELS[type].action} is disabled because its command name is empty.`, "failure");
         return;
     }
 
@@ -838,7 +837,7 @@ async function viewLookup(type: LookupType, user: User, guildId: string, channel
             clearPendingLookup();
             showToast(
                 "Iolite did not detect Sapphire's response. Configure Sapphire Bot ID if the bot has a different name.",
-                Toasts.Type.FAILURE
+                "failure"
             );
         }, 20_000);
     }
@@ -900,7 +899,7 @@ function openRecentMessages(user: User, guildId: string, channel?: Channel) {
     ContextMenuApi.closeContextMenu();
     const channelId = getCurrentChannelId(channel);
     if (!channelId) {
-        showToast("Iolite could not find the current channel.", Toasts.Type.FAILURE);
+        showToast("Iolite could not find the current channel.", "failure");
         return;
     }
     const currentChannel = ChannelStore.getChannel(channelId);
@@ -1408,11 +1407,11 @@ function showSapphireConfirmation(message: Message, pending: PendingModerationCo
                         }
                     });
                     closeQuickPanel();
-                    showToast(`Sapphire: ${choice.label} sent.`, Toasts.Type.SUCCESS);
+                    showToast(`Sapphire: ${choice.label} sent.`, "success");
                     return true;
                 } catch (error) {
                     console.error("[Iolite] Failed to submit Sapphire confirmation", error);
-                    showToast("Sapphire confirmation failed. Open the original message and try there.", Toasts.Type.FAILURE);
+                    showToast("Sapphire confirmation failed. Open the original message and try there.", "failure");
                     return false;
                 }
             }}
@@ -1500,7 +1499,7 @@ function onPresetKeyDown(event: KeyboardEvent) {
 
     const guildId = activeProfileTarget.guildId ?? SelectedGuildStore.getGuildId();
     if (!guildId) {
-        showToast("Open the profile from a server before using an Iolite preset.", Toasts.Type.FAILURE);
+        showToast("Open the profile from a server before using an Iolite preset.", "failure");
         return;
     }
 
